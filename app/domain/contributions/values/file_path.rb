@@ -28,7 +28,7 @@ module CodePraise
         raise(ArgumentError, 'Path mismatch') unless
           self.start_with?(root) || root.empty?
 
-        matches = self.match(%r{(?<folder>^#{root}[^/]+)})
+        matches = self.match(%r{(?<folder>^#{root}[^/]+)/?})
         matches[:folder]
       end
 

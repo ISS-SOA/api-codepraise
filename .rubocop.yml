@@ -16,6 +16,10 @@ plugins:
   - rubocop-rake
   - rubocop-sequel
 
+# Ignore use of OpenStruct for representers
+Style/OpenStructUse:
+  Enabled: false
+
 # Ignore block length where unavoidable (e.g., frameworks using blocks)
 Metrics/BlockLength:
   Enabled: true

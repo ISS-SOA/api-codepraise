@@ -18,12 +18,5 @@ require_app
 
 USERNAME = 'soumyaray'
 PROJECT_NAME = 'YPBT-app'
-GH_URL = 'http://github.com/soumyaray/YPBT-app'
 GITHUB_TOKEN = CodePraise::App.config.GITHUB_TOKEN
 CORRECT = YAML.safe_load_file('spec/fixtures/github_results.yml')
-
-# Helper method for acceptance tests
-# - deliberately using a :reek:UtilityFunction for testing
-def homepage
-  CodePraise::App.config.APP_HOST
-end

@@ -2,111 +2,90 @@
 
 require 'rack' # for Rack::MethodOverride
 require 'roda'
-require 'slim'
-require 'slim/include'
-
-require_relative 'helpers'
 
 module CodePraise
   # Web App
   class App < Roda
-    include RouteHelpers
-
     plugin :halt
     plugin :flash
     plugin :all_verbs # allows DELETE and other HTTP verbs beyond GET/POST
-    plugin :render, engine: 'slim', views: 'app/presentation/views_html'
-    plugin :public, root: 'app/presentation/public'
-    plugin :assets, path: 'app/presentation/assets',
-                    css: 'style.css', js: 'table_row.js'
-    plugin :common_logger, $stderr
 
-    use Rack::MethodOverride # allows HTTP verbs beyond GET/POST (e.g., DELETE)
-
-    MSG_GET_STARTED = 'Add a Github project to get started'
-    MSG_PROJECT_ADDED = 'Project added to your list'
-
+    # rubocop:disable Metrics/BlockLength
     route do |routing|
-      routing.assets # load CSS
-      response['Content-Type'] = 'text/html; charset=utf-8'
-      routing.public
+      response['Content-Type'] = 'application/json'
 
       # GET /
       routing.root do
-        # Get cookie viewer's previously seen projects
-        session[:watching] ||= []
+        message = "CodePraise API v1 at /api/v1/ in #{App.environment} mode"
 
-        result = Service::ListProjects.new.call(session[:watching])
+        result_response = Representer::HttpResponse.new(
+          Response::ApiResult.new(status: :ok, message:)
+        )
 
-        if result.failure?
-          flash[:error] = result.failure
-          viewable_projects = []
-        else
-          projects = result.value!
-          flash.now[:notice] = MSG_GET_STARTED if projects.none?
-
-          session[:watching] = projects.map(&:fullname)
-          viewable_projects = Views::ProjectsList.new(projects)
-        end
-
-        view 'home', locals: { projects: viewable_projects }
+        response.status = result_response.http_status_code
+        result_response.to_json
       end
 
-      routing.on 'project' do
-        routing.is do
-          # POST /project/
-          routing.post do
-            url_request = Forms::NewProject.new.call(routing.params)
-            project_made = Service::AddProject.new.call(url_request)
+      routing.on 'api/v1' do
+        routing.on 'projects' do
+          routing.on String, String do |owner_name, project_name|
+            # GET /projects/{owner_name}/{project_name}[/folder_namepath/]
+            routing.get do
+              path_request = Request::ProjectPath.new(
+                owner_name, project_name, request
+              )
 
-            if project_made.failure?
-              flash[:error] = project_made.failure
-              routing.redirect '/'
+              result = Service::AppraiseProject.new.call(requested: path_request)
+
+              if result.failure?
+                failed = Representer::HttpResponse.new(result.failure)
+                routing.halt failed.http_status_code, failed.to_json
+              end
+
+              http_response = Representer::HttpResponse.new(result.value!)
+              response.status = http_response.http_status_code
+
+              Representer::ProjectFolderContributions.new(
+                result.value!.message
+              ).to_json
             end
 
-            project = project_made.value!
-            session[:watching].insert(0, project.fullname).uniq!
-            flash[:notice] = MSG_PROJECT_ADDED
-            routing.redirect "project/#{project.owner.username}/#{project.name}"
-          end
-        end
+            # POST /projects/{owner_name}/{project_name}
+            routing.post do
+              result = Service::AddProject.new.call(
+                owner_name:, project_name:
+              )
 
-        routing.on String, String do |owner_name, project_name|
-          # DELETE /project/{owner_name}/{project_name}
-          routing.delete do
-            fullname = "#{owner_name}/#{project_name}"
-            session[:watching].delete(fullname)
+              if result.failure?
+                failed = Representer::HttpResponse.new(result.failure)
+                routing.halt failed.http_status_code, failed.to_json
+              end
 
-            routing.redirect '/'
-          end
-
-          # GET /project/{owner_name}/{project_name}[/folder_namepath/]
-          routing.get do
-            path_request = ProjectRequestPath.new(
-              owner_name, project_name, request
-            )
-
-            session[:watching] ||= []
-
-            result = Service::AppraiseProject.new.call(
-              watched_list: session[:watching],
-              requested: path_request
-            )
-
-            if result.failure?
-              flash[:error] = result.failure
-              routing.redirect '/'
+              http_response = Representer::HttpResponse.new(result.value!)
+              response.status = http_response.http_status_code
+              Representer::Project.new(result.value!.message).to_json
             end
+          end
 
-            appraised = result.value!
-            proj_folder = Views::ProjectFolderContributions.new(
-              appraised[:project], appraised[:folder]
-            )
+          routing.is do
+            # GET /projects?list={base64_json_array_of_project_fullnames}
+            routing.get do
+              list_req = Request::EncodedProjectList.new(routing.params)
+              result = Service::ListProjects.new.call(list_request: list_req)
 
-            view 'project', locals: { proj_folder: }
+              if result.failure?
+                failed = Representer::HttpResponse.new(result.failure)
+                routing.halt failed.http_status_code, failed.to_json
+              end
+
+              http_response = Representer::HttpResponse.new(result.value!)
+              response.status = http_response.http_status_code
+              Representer::ProjectsList.new(result.value!.message).to_json
+            end
           end
         end
       end
     end
+    # rubocop:enable Metrics/BlockLength
   end
 end

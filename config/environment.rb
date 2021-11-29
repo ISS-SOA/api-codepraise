@@ -20,8 +20,6 @@ module CodePraise
     Figaro.load
     def self.config = Figaro.env
 
-    use Rack::Session::Cookie, secret: config.SESSION_SECRET
-
     configure :app_test do
       require_relative '../spec/helpers/vcr_helper'
       VcrHelper.setup_vcr
@@ -39,7 +37,23 @@ module CodePraise
     def self.db = @db # rubocop:disable Style/TrivialAccessors
 
     # Logger Setup
-    @logger = Logger.new($stderr)
+    configure :development, :production do
+      plugin :common_logger, $stderr
+      @logger = Logger.new($stderr)
+    end
+
+    # Logger that outputs nowhere; used to suppress logging in test environment
+    class NullLogger < Logger
+      def initialize(*)
+        super(IO::NULL)
+      end
+    end
+
+    configure :test do
+      plugin :common_logger, NullLogger.new
+      @logger = NullLogger.new
+    end
+
     class << self
       attr_reader :logger
     end

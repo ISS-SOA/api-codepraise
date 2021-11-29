@@ -41,7 +41,7 @@ module CodePraise
       end
 
       def options
-        @options.map { |option| "--#{option}" }
+        @options.map { "--#{it}" }
       end
 
       def full_command

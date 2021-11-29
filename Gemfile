@@ -6,10 +6,12 @@ ruby File.read('.ruby-version').strip
 # CONFIGURATION
 gem 'figaro', '~> 1.0'
 gem 'pry'
+gem 'rack-test' # for testing and can also be used to diagnose in production
 gem 'rake', '~> 13.0'
 
 # PRESENTATION LAYER
-gem 'slim', '~> 5.0'
+gem 'multi_json', '~> 1.15'
+gem 'roar', '~> 1.1'
 
 # APPLICATION LAYER
 # Web application related
@@ -48,18 +50,12 @@ end
 
 # TESTING
 group :test do
-  # Unit/Integration/Acceptance Tests
-  gem 'minitest', '~> 5.20'
-  gem 'minitest-rg', '~> 5.2'
-  gem 'simplecov', '~> 0'
-  gem 'vcr', '~> 6'
-  gem 'webmock', '~> 3'
-
-  # Acceptance Tests
-  gem 'headless', '~> 2.0'
-  gem 'page-object', '~> 2.0'
-  gem 'selenium-webdriver', '~> 4.0'
-  gem 'watir', '~> 7.0'
+  # API Unit/Integration/Acceptance Tests
+  gem 'minitest', '~> 5.0'
+  gem 'minitest-rg', '~> 5.0'
+  gem 'simplecov', '~> 0.0'
+  gem 'vcr', '~> 6.0'
+  gem 'webmock', '~> 3.0'
 end
 
 # Development

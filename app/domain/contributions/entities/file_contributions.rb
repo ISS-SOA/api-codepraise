@@ -29,18 +29,24 @@ module CodePraise
         file_path.language
       end
 
+      def total_credits
+        credit_share.total_credits
+      end
+
       def credit_share
         return Value::CreditShare.new if not_wanted
 
         @credit_share ||=
           lines.each_with_object(Value::CreditShare.new) do |line, credit|
-            credit.add_credit(line)
+            credit.add_credit(line.contributor, line.credit)
           end
       end
 
       def contributors
-        credit_share.keys
+        credit_share.contributors
       end
+
+      private
 
       def not_wanted
         !wanted

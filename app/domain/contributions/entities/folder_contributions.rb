@@ -21,8 +21,20 @@ module CodePraise
         files.map(&:line_count).sum
       end
 
+      def total_credits
+        files.map(&:total_credits).sum
+      end
+
       def lines
         files.map(&:lines).reduce(&:+)
+      end
+
+      def any_subfolders?
+        subfolders.count.positive?
+      end
+
+      def any_base_files?
+        base_files.count.positive?
       end
 
       def credit_share
@@ -30,23 +42,23 @@ module CodePraise
       end
 
       def contributors
-        credit_share.keys
+        credit_share.contributors
       end
+
+      private
 
       def folder_path
         path.empty? ? path : "#{path}/"
       end
 
-      private
+      def nested_files
+        files - base_files
+      end
 
       def assign_base_files
         files
           .select { |file| file.file_path.directory == folder_path }
           .each   { |base_file| self[base_file.file_path.filename] = base_file }
-      end
-
-      def nested_files
-        files - base_files
       end
 
       def subfolder_files
