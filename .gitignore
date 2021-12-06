@@ -7,3 +7,4 @@ coverage/*
 !coverage/.resultset.json
 *.db
 repostore/**/
+_cache/
