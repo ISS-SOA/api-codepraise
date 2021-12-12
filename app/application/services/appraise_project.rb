@@ -8,19 +8,23 @@ module CodePraise
     class AppraiseProject
       include Dry::Transaction
 
-      step :retrieve_remote_project
-      step :clone_remote
+      step :find_project_details
+      step :check_project_eligibility
+      step :request_cloning_worker
       step :appraise_contributions
 
       private
 
+      # rubocop:disable Lint/UselessConstantScoping
       NO_PROJ_ERR = 'Project not found'
       DB_ERR = 'Having trouble accessing the database'
       CLONE_ERR = 'Could not clone this project'
-      TOO_LARGE_ERR = 'Project is too large to clone'
+      TOO_LARGE_ERR = 'Project is too large to analyze'
       NO_FOLDER_ERR = 'Could not find that folder'
+      PROCESSING_MSG = 'Processing the appraisal request; please check back later'
+      # rubocop:enable Lint/UselessConstantScoping
 
-      def retrieve_remote_project(input)
+      def find_project_details(input)
         input[:project] = Repository::For.klass(Entity::Project).find_full_name(
           input[:requested].owner_name, input[:requested].project_name
         )
@@ -34,16 +38,25 @@ module CodePraise
         Failure(Response::ApiResult.new(status: :internal_error, message: DB_ERR))
       end
 
-      def clone_remote(input)
-        gitrepo = GitRepo.new(input[:project])
-        gitrepo.clone unless gitrepo.exists_locally?
+      def check_project_eligibility(input)
+        if input[:project].too_large?
+          Failure(Response::ApiResult.new(status: :forbidden, message: TOO_LARGE_ERR))
+        else
+          input[:gitrepo] = GitRepo.new(input[:project])
+          Success(input)
+        end
+      end
 
-        Success(input.merge(gitrepo:))
-      rescue GitRepo::Errors::TooLargeToClone
-        App.logger.warn "Project too large: #{input[:project].fullname} (#{input[:project].size} KB)"
-        Failure(Response::ApiResult.new(status: :forbidden, message: TOO_LARGE_ERR))
-      rescue StandardError => error
-        App.logger.error error.backtrace.join("\n")
+      def request_cloning_worker(input)
+        return Success(input) if input[:gitrepo].exists_locally?
+
+        Messaging::Queue
+          .new(App.config.CLONE_QUEUE_URL, App.config)
+          .send(Representer::Project.new(input[:project]).to_json)
+
+        Failure(Response::ApiResult.new(status: :processing, message: PROCESSING_MSG))
+      rescue StandardError => e
+        log_error(e)
         Failure(Response::ApiResult.new(status: :internal_error, message: CLONE_ERR))
       end
 
@@ -54,16 +67,20 @@ module CodePraise
         appraisal = Response::ProjectFolderContributions.new(input[:project], input[:folder])
         Success(Response::ApiResult.new(status: :ok, message: appraisal))
       rescue StandardError
-        App.logger.error "Could not find: #{full_request_path(input)}"
+        # App.logger.error "Could not find: #{full_request_path(input)}"
         Failure(Response::ApiResult.new(status: :not_found, message: NO_FOLDER_ERR))
       end
 
-      # Helper methods
+      # Helper methods for steps
 
       def full_request_path(input)
         [input[:requested].owner_name,
          input[:requested].project_name,
          input[:requested].folder_name].join('/')
+      end
+
+      def log_error(error)
+        App.logger.error [error.inspect, error.backtrace].flatten.join("\n")
       end
     end
   end

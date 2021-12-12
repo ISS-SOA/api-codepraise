@@ -4,7 +4,7 @@ trap "kill 0" EXIT
 
 # Run application server as backround process (using '&')
 # see: https://kb.iu.edu/d/afnz
-RACK_ENV=test bundle exec puma -p 9000 &
+rake worker:run:test &
 
 # Run acceptance tests on browser
-rake spec:acceptance
+bundle exec rake spec
