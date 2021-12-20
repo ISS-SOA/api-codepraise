@@ -47,11 +47,6 @@ gem 'hirb'
 # gem 'hirb-unicode' # incompatible with new rubocop
 gem 'sequel', '~> 5.0'
 
-# Asynchronicity
-gem 'aws-sdk-sqs', '~> 1.0'
-gem 'concurrent-ruby', '~> 1.0'
-gem 'shoryuken', '~> 6.0'
-
 group :development, :test do
   gem 'sqlite3', '~> 1.0'
 end
@@ -59,6 +54,14 @@ end
 group :production do
   gem 'pg', '~> 1.0'
 end
+
+# Asynchronicity
+gem 'aws-sdk-sqs', '~> 1.0'
+gem 'concurrent-ruby', '~> 1.0'
+
+# WORKER
+gem 'faye', '~> 1.0'
+gem 'shoryuken', '~> 6.0'
 
 # TESTING
 group :test do
