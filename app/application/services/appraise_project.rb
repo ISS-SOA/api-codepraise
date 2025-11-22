@@ -17,6 +17,7 @@ module CodePraise
       NO_PROJ_ERR = 'Project not found'
       DB_ERR = 'Having trouble accessing the database'
       CLONE_ERR = 'Could not clone this project'
+      TOO_LARGE_ERR = 'Project is too large to clone'
       NO_FOLDER_ERR = 'Could not find that folder'
 
       def retrieve_remote_project(input)
@@ -38,6 +39,9 @@ module CodePraise
         gitrepo.clone unless gitrepo.exists_locally?
 
         Success(input.merge(gitrepo:))
+      rescue GitRepo::Errors::TooLargeToClone
+        App.logger.warn "Project too large: #{input[:project].fullname} (#{input[:project].size} KB)"
+        Failure(Response::ApiResult.new(status: :forbidden, message: TOO_LARGE_ERR))
       rescue StandardError => error
         App.logger.error error.backtrace.join("\n")
         Failure(Response::ApiResult.new(status: :internal_error, message: CLONE_ERR))

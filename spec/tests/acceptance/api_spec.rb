@@ -90,6 +90,34 @@ describe 'Test API routes' do
       _(last_response.status).must_equal 404
       _(JSON.parse(last_response.body)['status']).must_include 'not'
     end
+
+    it 'should report error for a project that is too large to clone' do
+      # First, add a project to the database
+      CodePraise::Service::AddProject.new.call(
+        owner_name: USERNAME, project_name: PROJECT_NAME
+      )
+
+      # Update the project's size directly in the database to exceed MAX_SIZE_KB
+      db_project = CodePraise::Database::ProjectOrm
+        .where(name: PROJECT_NAME).first
+      db_project.update(size: CodePraise::Entity::Project::MAX_SIZE_KB + 1000)
+
+      # Reload the project to get updated size
+      project = CodePraise::Repository::For.klass(CodePraise::Entity::Project)
+        .find_full_name(USERNAME, PROJECT_NAME)
+
+      # Delete local clone if it exists to force re-cloning
+      gitrepo = CodePraise::GitRepo.new(project)
+      gitrepo.delete if gitrepo.exists_locally?
+
+      # Try to appraise - should fail with forbidden status
+      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}"
+      _(last_response.status).must_equal 403
+
+      response_body = JSON.parse(last_response.body)
+      _(response_body['status']).must_equal 'forbidden'
+      _(response_body['message']).must_include 'too large'
+    end
   end
 
   describe 'Add projects route' do
