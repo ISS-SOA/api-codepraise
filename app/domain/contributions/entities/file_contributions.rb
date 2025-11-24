@@ -9,17 +9,6 @@ module CodePraise
     class FileContributions
       include Mixins::ContributionsCalculator
 
-      WANTED_LANGUAGES = [
-        Value::CodeLanguage::Ruby,
-        Value::CodeLanguage::Python,
-        Value::CodeLanguage::Javascript,
-        Value::CodeLanguage::Css,
-        Value::CodeLanguage::Html,
-        Value::CodeLanguage::Slim,
-        Value::CodeLanguage::Erb,
-        Value::CodeLanguage::Markdown
-      ].freeze
-
       attr_reader :file_path, :lines
 
       def initialize(file_path:, lines:)
@@ -36,7 +25,7 @@ module CodePraise
       end
 
       def credit_share
-        return Value::CreditShare.new if not_wanted
+        return Value::CreditShare.new if unwanted?
 
         @credit_share ||=
           lines.each_with_object(Value::CreditShare.new) do |line, credit|
@@ -50,13 +39,8 @@ module CodePraise
 
       private
 
-      def not_wanted
-        !wanted
-      end
-
-      def wanted
-        WANTED_LANGUAGES.include?(language)
-      end
+      def unwanted? = language.unwanted?
+      def wanted? = language.wanted?
     end
   end
 end

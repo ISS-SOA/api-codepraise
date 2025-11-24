@@ -13,8 +13,6 @@ module CodePraise
     class LocalGitRepo
       ONLY_FOLDERS = '**/'
       FILES_AND_FOLDERS = '**/*'
-      TEXT_FILES = %w[rb py js css html slim md erb].join('|')
-      CODE_FILENAME_MATCH = /\.(#{TEXT_FILES})$/
 
       attr_reader :git_repo_path
 
@@ -33,7 +31,7 @@ module CodePraise
 
         @files ||= in_repo do
           Dir.glob(FILES_AND_FOLDERS).select do |path|
-            File.file?(path) && (path =~ CODE_FILENAME_MATCH)
+            File.file?(path) && Value::FilePath.new(path).wanted?
           end
         end
       end

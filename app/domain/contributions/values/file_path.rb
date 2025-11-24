@@ -17,11 +17,17 @@ module CodePraise
       end
 
       def extension
-        @extension ||= filename.match(/\.([a-zA-Z0-9]+$)/).captures.first
+        @extension ||= filename.match(/\.([a-zA-Z0-9]+$)/)&.captures&.first
       end
 
       def language
+        return CodeLanguage::Unknown unless extension
+
         CodeLanguage.extension_language(extension)
+      end
+
+      def wanted?
+        language.wanted?
       end
 
       def folder_after(root)
