@@ -29,8 +29,8 @@ module CodePraise
     configure :development do
       use Rack::Cache,
           verbose: true,
-          metastore: 'file:_cache/rack/meta',
-          entitystore: 'file:_cache/rack/body'
+          metastore: "#{config.LOCAL_CACHE}/meta",
+          entitystore: "#{config.LOCAL_CACHE}/body"
     end
 
     configure :production do

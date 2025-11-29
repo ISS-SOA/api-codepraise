@@ -5,7 +5,7 @@ require 'redis'
 module CodePraise
   module Cache
     # Redis client utility
-    class Client
+    class Remote
       def initialize(config)
         @redis = Redis.new(url: config.REDISCLOUD_URL)
       end
