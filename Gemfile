@@ -40,11 +40,17 @@ gem 'dry-types', '~> 1.0'
 # INFRASTRUCTURE LAYER
 # Networking
 gem 'http', '~> 5.0'
+gem 'openssl', '~> 3.3.1' # resolves MacoOS CRL error: https://github.com/ruby/openssl/issues/949
 
 # Database
 gem 'hirb'
 # gem 'hirb-unicode' # incompatible with new rubocop
 gem 'sequel', '~> 5.0'
+
+# Asynchronicity
+gem 'aws-sdk-sqs', '~> 1.0'
+gem 'concurrent-ruby', '~> 1.0'
+gem 'shoryuken', '~> 6.0'
 
 group :development, :test do
   gem 'sqlite3', '~> 1.0'

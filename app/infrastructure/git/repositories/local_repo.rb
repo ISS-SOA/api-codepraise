@@ -16,9 +16,9 @@ module CodePraise
 
       attr_reader :git_repo_path
 
-      def initialize(remote, repostore_path)
+      def initialize(remote)
         @remote = remote
-        @git_repo_path = [repostore_path, @remote.unique_id].join('/')
+        @git_repo_path = [ENV['REPOSTORE_PATH'], @remote.unique_id].join('/')
       end
 
       def clone_remote
@@ -45,19 +45,18 @@ module CodePraise
         Dir.exist? @git_repo_path
       end
 
-      # Deliberately :reek:MissingSafeMethod delete
       def delete
         FileUtils.rm_rf(@git_repo_path)
+      end
+
+      def wipe
+        FileUtils.rm_rf @git_repo_path
       end
 
       private
 
       def raise_unless_setup
         raise Errors::InvalidLocalGitRepo unless exists?
-      end
-
-      def wipe
-        FileUtils.rm_rf @git_repo_path
       end
     end
   end
