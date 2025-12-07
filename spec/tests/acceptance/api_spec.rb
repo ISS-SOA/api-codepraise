@@ -123,7 +123,7 @@ describe 'Test API routes' do
         .find_full_name(USERNAME, PROJECT_NAME)
 
       # Delete local clone if it exists to force re-cloning
-      gitrepo = CodePraise::GitRepo.new(project)
+      gitrepo = CodePraise::GitRepo.new(project, CodePraise::App.config)
       gitrepo.delete if gitrepo.exists_locally?
 
       # Try to appraise - should fail with forbidden status
