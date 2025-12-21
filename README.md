@@ -72,6 +72,17 @@ rake spec            # Run unit and integration tests
 bash spec/acceptance_tests   # Run full acceptance tests (starts worker automatically)
 ```
 
+## Architecture
+
+This project uses **Clean Architecture** with separate DDD-style layers for the API and background worker:
+
+- **API (`app/`)**: Handles HTTP requests, database, GitHub integration
+- **Worker (`workers/`)**: Handles git clone/blame operations, Redis caching
+
+Both use parallel layer structures: `domain/`, `infrastructure/`, `presentation/`, `application/`
+
+See `CLAUDE.md` for detailed architecture documentation.
+
 ## Routes
 
 ### Root check
