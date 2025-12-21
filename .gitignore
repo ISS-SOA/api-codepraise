@@ -9,3 +9,4 @@ coverage/*
 *.db
 repostore/**/
 _cache/
+spec/logs/
