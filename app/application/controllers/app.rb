@@ -32,10 +32,8 @@ module CodePraise
           routing.on String, String do |owner_name, project_name|
             # GET /projects/{owner_name}/{project_name}[/folder_namepath/]
             routing.get do
-              App.configure :production do
-                response.cache_control public: true, max_age: 300
-              end
-
+              # Appraisal results cached in Redis by worker (1-day TTL)
+              # No HTTP caching needed - Redis is the source of truth
               request_id = [request.env, request.path, Time.now.to_f].hash
 
               path_request = Request::ProjectPath.new(
