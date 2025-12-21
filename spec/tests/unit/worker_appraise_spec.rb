@@ -6,7 +6,7 @@ require_relative '../../../workers/services/appraise_project'
 
 describe 'Unit test of Worker::AppraiseProject' do
   before do
-    @cache = CacheHelper.create_fake_cache
+    @cache = CacheHelper.create_test_cache
     CacheHelper.wipe_cache(@cache)
 
     # Create test project OpenStruct (simulating deserialized JSON)

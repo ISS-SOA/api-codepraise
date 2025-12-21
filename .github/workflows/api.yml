@@ -28,12 +28,37 @@ jobs:
     runs-on: ${{ matrix.os }}-latest  # Runs on latest builds of matrix OSes
     env:
       BUNDLE_WITHOUT: production # skip installing production gem (pg)
+
+    # Redis service container for caching (Linux only - macOS uses brew)
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Service containers only work on Linux runners
+        # macOS will install Redis via Homebrew in the steps below
+
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
-    
-      # Builds on a predefined action that has Ruby installed 
+
+      # Install Redis on macOS (service containers only work on Linux)
+      - name: Install Redis (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install redis
+          brew services start redis
+          # Wait for Redis to be ready
+          sleep 2
+          redis-cli ping
+
+      # Builds on a predefined action that has Ruby installed
       - uses: ruby/setup-ruby@v1
         with:
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
@@ -49,6 +74,7 @@ jobs:
           DB_FILENAME: ${{ secrets.DB_FILENAME }}
           REPOSTORE_PATH: ${{ secrets.REPOSTORE_PATH }}
           API_HOST: ${{ secrets.API_HOST }}
+          REDISCLOUD_URL: redis://localhost:6379
           CLONE_QUEUE_URL: ${{ secrets.CLONE_QUEUE_URL }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

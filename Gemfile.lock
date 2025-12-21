@@ -94,8 +94,6 @@ GEM
       base64
       eventmachine (>= 1.0.0.beta.4)
     eventmachine (1.2.7)
-    fakeredis (0.9.2)
-      redis (~> 4.8)
     faye (1.4.1)
       cookiejar (>= 0.3.0)
       em-http-request (>= 1.1.6)
@@ -278,7 +276,6 @@ DEPENDENCIES
   dry-transaction (~> 0)
   dry-types (~> 1.0)
   dry-validation (~> 1.0)
-  fakeredis (~> 0.9)
   faye (~> 1.0)
   figaro (~> 1.0)
   flog

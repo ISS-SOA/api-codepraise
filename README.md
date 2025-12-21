@@ -1,6 +1,76 @@
 # CodePraise Web API
 
-Web API that allowsGithub *projects* to be *appraised* for inidividual *contributions* by *members* of a team.
+Web API that allows Github *projects* to be *appraised* for individual *contributions* by *members* of a team.
+
+## Setup
+
+### Prerequisites
+
+1. **Ruby** - See `.ruby-version` for required version
+2. **Redis** - Required for caching appraisal results
+3. **AWS Account** - For SQS message queue (worker communication)
+
+### Install Redis
+
+**Using rake tasks (recommended):**
+
+```bash
+rake redis:start    # Start Redis Docker container
+rake redis:stop     # Stop Redis when done
+rake redis:status   # Check connectivity
+```
+
+**Or manually with Homebrew (macOS):**
+
+```bash
+brew install redis
+brew services start redis
+```
+
+### Install Dependencies
+
+```bash
+bundle install
+```
+
+### Configure Secrets
+
+```bash
+cp config/secrets_example.yml config/secrets.yml
+```
+
+Edit `config/secrets.yml` and add your:
+
+- `GITHUB_TOKEN` - GitHub personal access token
+- AWS credentials for SQS queue
+
+### Setup Database
+
+```bash
+bundle exec rake db:migrate                  # Development database
+RACK_ENV=test bundle exec rake db:migrate    # Test database
+```
+
+### Verify Setup
+
+```bash
+rake redis:status    # Check Redis connectivity
+rake queues:status   # Check SQS queue status
+```
+
+## Running the Application
+
+```bash
+rake run             # Start API server on port 9090
+rake worker:run:dev  # Start background worker (in separate terminal)
+```
+
+## Testing
+
+```bash
+rake spec            # Run unit and integration tests
+bash spec/acceptance_tests   # Run full acceptance tests (starts worker automatically)
+```
 
 ## Routes
 

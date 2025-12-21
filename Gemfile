@@ -71,9 +71,6 @@ group :test do
   gem 'simplecov', '~> 0.0'
   gem 'vcr', '~> 6.0'
   gem 'webmock', '~> 3.0'
-
-  # Redis mocking for isolated tests
-  gem 'fakeredis', '~> 0.9'
 end
 
 # Development

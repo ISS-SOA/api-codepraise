@@ -8,10 +8,13 @@ task :default do
 end
 
 desc 'Run unit and integration tests'
-Rake::TestTask.new(:spec) do |t|
+Rake::TestTask.new(:spec_only) do |t|
   t.pattern = 'spec/tests/**/*_spec.rb'
   t.warning = false
 end
+
+# Run specs with Redis check
+task spec: ['redis:ensure', :spec_only]
 
 desc 'Keep rerunning unit/integration tests upon changes'
 task :respec do
@@ -105,6 +108,97 @@ namespace :repos do
     else
       puts @repo_dirs.join("\n")
     end
+  end
+end
+
+namespace :redis do
+  CONTAINER_NAME = 'redis-codepraise'
+
+  task :config do # rubocop:disable Rake/Desc
+    require 'redis'
+    require_relative 'config/environment'
+    @api = CodePraise::App
+  end
+
+  desc 'Check Redis connectivity'
+  task status: :config do
+    redis_url = @api.config.REDISCLOUD_URL
+    puts "Checking Redis at: #{redis_url}"
+    redis = Redis.new(url: redis_url)
+    response = redis.ping
+    puts "Redis responded: #{response}"
+    puts 'Redis connection successful!'
+  rescue Redis::CannotConnectError => e
+    puts "Redis connection FAILED: #{e.message}"
+    puts ''
+    puts 'To start Redis locally:'
+    puts '  rake redis:start'
+    exit 1
+  end
+
+  desc 'Start Redis Docker container'
+  task :start do
+    # Check if container exists
+    container_exists = system("docker ps -a --format '{{.Names}}' | grep -q '^#{CONTAINER_NAME}$'")
+
+    if container_exists
+      # Container exists, check if running
+      container_running = system("docker ps --format '{{.Names}}' | grep -q '^#{CONTAINER_NAME}$'")
+      if container_running
+        puts "Redis container '#{CONTAINER_NAME}' is already running"
+      else
+        puts "Starting existing Redis container '#{CONTAINER_NAME}'..."
+        sh "docker start #{CONTAINER_NAME}"
+      end
+    else
+      # Create and start new container
+      puts "Creating and starting Redis container '#{CONTAINER_NAME}'..."
+      sh "docker run -d --name #{CONTAINER_NAME} -p 6379:6379 redis:latest"
+    end
+
+    # Wait for Redis to be ready
+    puts 'Waiting for Redis to be ready...'
+    sleep 2
+    Rake::Task['redis:status'].invoke
+  end
+
+  desc 'Stop Redis Docker container'
+  task :stop do
+    container_running = system("docker ps --format '{{.Names}}' | grep -q '^#{CONTAINER_NAME}$'")
+    if container_running
+      puts "Stopping Redis container '#{CONTAINER_NAME}'..."
+      sh "docker stop #{CONTAINER_NAME}"
+      puts 'Redis container stopped'
+    else
+      puts "Redis container '#{CONTAINER_NAME}' is not running"
+    end
+  end
+
+  desc 'Remove Redis Docker container'
+  task :remove do
+    Rake::Task['redis:stop'].invoke
+    container_exists = system("docker ps -a --format '{{.Names}}' | grep -q '^#{CONTAINER_NAME}$'")
+    if container_exists
+      puts "Removing Redis container '#{CONTAINER_NAME}'..."
+      sh "docker rm #{CONTAINER_NAME}"
+      puts 'Redis container removed'
+    else
+      puts "Redis container '#{CONTAINER_NAME}' does not exist"
+    end
+  end
+
+  desc 'Ensure Redis is running (start if needed)'
+  task :ensure do
+    require 'redis'
+    require_relative 'config/environment'
+    redis_url = CodePraise::App.config.REDISCLOUD_URL
+
+    redis = Redis.new(url: redis_url)
+    redis.ping
+    puts 'Redis is running'
+  rescue Redis::CannotConnectError
+    puts 'Redis not running, starting Docker container...'
+    Rake::Task['redis:start'].invoke
   end
 end
 

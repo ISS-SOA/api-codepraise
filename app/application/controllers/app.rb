@@ -42,9 +42,9 @@ module CodePraise
                 owner_name, project_name, request
               )
 
-              result = Service::AppraiseProject.new.call(
+              result = Service::FetchOrRequestAppraisal.new.call(
                 requested: path_request,
-                request_id: request_id,
+                request_id:,
                 config: App.config
               )
 
@@ -53,12 +53,17 @@ module CodePraise
                 routing.halt failed.http_status_code, failed.to_json
               end
 
-              http_response = Representer::HttpResponse.new(result.value!)
-              response.status = http_response.http_status_code
-
-              Representer::ProjectFolderContributions.new(
-                result.value!.message
-              ).to_json
+              # Cache hit - return pre-serialized JSON directly
+              appraisal_result = result.value!
+              if appraisal_result[:cache_hit]
+                response.status = 200
+                appraisal_result[:cached_json]
+              else
+                # Should not reach here - success means cache hit
+                # Worker requests return Failure with :processing status
+                response.status = 200
+                appraisal_result[:cached_json]
+              end
             end
 
             # POST /projects/{owner_name}/{project_name}

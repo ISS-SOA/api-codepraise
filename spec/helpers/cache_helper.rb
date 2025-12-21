@@ -1,19 +1,20 @@
 # frozen_string_literal: true
 
-require 'fakeredis'
-
 # Helper for Redis cache testing
-# Provides in-memory Redis mock via fakeredis gem
+# Uses real Redis with database 2 (test database) to avoid conflicts with:
+# - Database 0: Rack::Cache (reverse proxy)
+# - Database 1: Appraisal cache (production/development)
 module CacheHelper
-  # Create a fake Redis-backed cache instance for testing
-  # Returns a Cache::Remote that uses fakeredis (in-memory)
-  def self.create_fake_cache
-    config = OpenStruct.new(REDISCLOUD_URL: 'redis://localhost:6379/15')
-    CodePraise::Cache::Remote.new(config)
+  # Create a cache instance for testing
+  # Uses App.config which points to real Redis, but Cache::Remote
+  # automatically uses database 2 when RACK_ENV=test
+  def self.create_test_cache
+    CodePraise::Cache::Remote.new(CodePraise::App.config)
   end
 
-  # Wipe all keys from fake Redis
-  def self.wipe_cache(cache)
+  # Wipe all keys from test cache
+  def self.wipe_cache(cache = nil)
+    cache ||= create_test_cache
     cache.wipe
   end
 end

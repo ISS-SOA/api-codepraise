@@ -1,10 +1,11 @@
 # frozen_string_literal: true
 
 require_relative '../require_app'
+require_app
+
 require_relative 'clone_monitor'
 require_relative 'job_reporter'
 require_relative 'services/appraise_project'
-require_app
 
 require 'figaro'
 require 'shoryuken'
@@ -55,7 +56,7 @@ module GitClone
     def perform_appraisal(job)
       gitrepo = CodePraise::GitRepo.new(job.project, Worker.config)
 
-      Worker::AppraiseProject.new.call(
+      ::Worker::AppraiseProject.new.call(
         project: job.project,
         folder_path: job.folder_path,
         config: Worker.config,

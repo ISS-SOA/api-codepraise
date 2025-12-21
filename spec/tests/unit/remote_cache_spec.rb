@@ -3,9 +3,9 @@
 require_relative '../../helpers/spec_helper'
 require_relative '../../helpers/cache_helper'
 
-describe 'Unit test of Cache::Remote with fakeredis' do
+describe 'Unit test of Cache::Remote' do
   before do
-    @cache = CacheHelper.create_fake_cache
+    @cache = CacheHelper.create_test_cache
     CacheHelper.wipe_cache(@cache)
   end
 
@@ -47,13 +47,14 @@ describe 'Unit test of Cache::Remote with fakeredis' do
   end
 
   describe 'keys' do
-    it 'should list all keys' do
+    it 'should list all keys with test prefix' do
       @cache.set('key1', 'value1', ttl: 3600)
       @cache.set('key2', 'value2', ttl: 3600)
 
       keys = @cache.keys
-      _(keys).must_include 'key1'
-      _(keys).must_include 'key2'
+      # In test environment, keys are prefixed with 'test:'
+      _(keys).must_include 'test:key1'
+      _(keys).must_include 'test:key2'
       _(keys.length).must_equal 2
     end
   end
