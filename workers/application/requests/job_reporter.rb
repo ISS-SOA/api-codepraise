@@ -2,7 +2,7 @@
 
 # Note: ProgressPublisher is loaded via require_worker (infrastructure/messaging)
 
-module GitClone
+module Appraiser
   # Reports job progress to client
   class JobReporter
     attr_reader :project, :folder_path

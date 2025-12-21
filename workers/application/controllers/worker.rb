@@ -9,7 +9,7 @@ require_worker   # Load worker-only layers (domain, infrastructure, presentation
 require 'figaro'
 require 'shoryuken'
 
-module GitClone
+module Appraiser
   # Shoryuken worker class to clone repos and appraise contributions
   class Worker
     # Environment variables setup

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module GitClone
+module Appraiser
   # Infrastructure to clone while yielding progress
   # Legacy module for backwards compatibility
   module CloneMonitor
