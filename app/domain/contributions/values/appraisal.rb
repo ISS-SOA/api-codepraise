@@ -3,9 +3,11 @@
 require 'dry-types'
 require 'dry-struct'
 
-# Require dependencies that load after this file alphabetically
+# Require project entity (always available in API)
 require_relative '../../projects/entities/project'
-require_relative '../entities/folder_contributions'
+
+# Note: FolderContributions is loaded by the worker via workers/domain/contributions/
+# The folder attribute uses duck typing - any object responding to expected methods
 
 module CodePraise
   module Value
@@ -28,7 +30,8 @@ module CodePraise
       attribute :folder_path, Strict::String
 
       # Folder contributions (present on success, nil on error)
-      attribute :folder, Instance(Entity::FolderContributions).optional
+      # Uses Nominal type to accept any FolderContributions-like object
+      attribute :folder, Nominal(Object).optional
 
       # Error details (present on error, nil on success)
       attribute :error_type, Strict::String.optional

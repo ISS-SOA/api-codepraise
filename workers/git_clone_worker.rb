@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 require_relative '../require_app'
-require_app
+require_relative '../require_worker'
+
+require_app      # Load API layers (domain, infrastructure, presentation, application)
+require_worker   # Load worker-only layers (domain, services)
 
 require_relative 'clone_monitor'
 require_relative 'job_reporter'
-require_relative 'services/appraise_project'
 
 require 'figaro'
 require 'shoryuken'

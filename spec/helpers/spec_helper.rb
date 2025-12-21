@@ -14,7 +14,10 @@ require 'vcr'
 require 'webmock'
 
 require_relative '../../require_app'
-require_app
+require_relative '../../require_worker'
+
+require_app              # Load API layers
+require_worker('domain') # Load worker domain for tests using git infrastructure
 
 USERNAME = 'soumyaray'
 PROJECT_NAME = 'YPBT-app'
