@@ -16,8 +16,8 @@ require 'webmock'
 require_relative '../../require_app'
 require_relative '../../require_worker'
 
-require_app                                  # Load API layers
-require_worker(%w[domain infrastructure])    # Load worker domain + git infrastructure for tests
+require_app                                            # Load API layers
+require_worker(%w[domain infrastructure presentation]) # Load worker layers for tests (no application)
 
 USERNAME = 'soumyaray'
 PROJECT_NAME = 'YPBT-app'

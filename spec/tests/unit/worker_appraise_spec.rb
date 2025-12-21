@@ -2,7 +2,7 @@
 
 require_relative '../../helpers/spec_helper'
 require_relative '../../helpers/cache_helper'
-require_relative '../../../workers/services/appraise_project'
+require_relative '../../../workers/application/services/appraise_project'
 
 describe 'Unit test of Worker::AppraiseProject' do
   before do

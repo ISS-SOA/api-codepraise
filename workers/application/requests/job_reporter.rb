@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative 'progress_publisher'
+# Note: ProgressPublisher is loaded via require_worker (infrastructure/messaging)
 
 module GitClone
   # Reports job progress to client
