@@ -29,7 +29,7 @@ module Appraiser
     include Shoryuken::Worker
 
     Shoryuken.sqs_client_receive_message_opts = { wait_time_seconds: 20 }
-    shoryuken_options queue: config.CLONE_QUEUE_URL, auto_delete: true
+    shoryuken_options queue: config.WORKER_QUEUE_URL, auto_delete: true
 
     def perform(_sqs_msg, request)
       job = JobReporter.new(request, Worker.config)

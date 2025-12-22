@@ -13,8 +13,8 @@ Rake::TestTask.new(:spec_only) do |t|
   t.warning = false
 end
 
-# Run specs with Redis check
-task spec: ['redis:ensure', :spec_only]
+# Run specs with cache check
+task spec: ['cache:ensure', :spec_only]
 
 desc 'Keep rerunning unit/integration tests upon changes'
 task :respec do
@@ -111,125 +111,132 @@ namespace :repos do
   end
 end
 
-namespace :redis do
-  CONTAINER_NAME = 'redis-codepraise'
+namespace :cache do
+  REDIS_CONTAINER = 'redis-codepraise'
 
   task :config do # rubocop:disable Rake/Desc
     require 'redis'
     require_relative 'config/environment'
+    require_relative 'app/infrastructure/cache/remote_cache'
     @api = CodePraise::App
   end
 
-  desc 'Check Redis connectivity'
+  desc 'Check cache server connectivity'
   task status: :config do
-    redis_url = @api.config.REDISCLOUD_URL
-    puts "Checking Redis at: #{redis_url}"
+    redis_url = @api.config.REDIS_URL
+    puts "Environment: #{@api.environment}"
+    puts "Checking cache at: #{redis_url}"
     redis = Redis.new(url: redis_url)
     response = redis.ping
-    puts "Redis responded: #{response}"
-    puts 'Redis connection successful!'
+    puts "Cache responded: #{response}"
+    puts 'Cache connection successful!'
   rescue Redis::CannotConnectError => e
-    puts "Redis connection FAILED: #{e.message}"
+    puts "Cache connection FAILED: #{e.message}"
     puts ''
     puts 'To start Redis locally:'
-    puts '  rake redis:start'
+    puts '  rake cache:redis:start'
     exit 1
   end
 
-  desc 'Start Redis Docker container'
-  task :start do
-    # Check if container exists
-    container_exists = system("docker ps -a --format '{{.Names}}' | grep -q '^#{CONTAINER_NAME}$'")
-
-    if container_exists
-      # Container exists, check if running
-      container_running = system("docker ps --format '{{.Names}}' | grep -q '^#{CONTAINER_NAME}$'")
-      if container_running
-        puts "Redis container '#{CONTAINER_NAME}' is already running"
-      else
-        puts "Starting existing Redis container '#{CONTAINER_NAME}'..."
-        sh "docker start #{CONTAINER_NAME}"
-      end
-    else
-      # Create and start new container
-      puts "Creating and starting Redis container '#{CONTAINER_NAME}'..."
-      sh "docker run -d --name #{CONTAINER_NAME} -p 6379:6379 redis:latest"
-    end
-
-    # Wait for Redis to be ready
-    puts 'Waiting for Redis to be ready...'
-    sleep 2
-    Rake::Task['redis:status'].invoke
-  end
-
-  desc 'Stop Redis Docker container'
-  task :stop do
-    container_running = system("docker ps --format '{{.Names}}' | grep -q '^#{CONTAINER_NAME}$'")
-    if container_running
-      puts "Stopping Redis container '#{CONTAINER_NAME}'..."
-      sh "docker stop #{CONTAINER_NAME}"
-      puts 'Redis container stopped'
-    else
-      puts "Redis container '#{CONTAINER_NAME}' is not running"
-    end
-  end
-
-  desc 'Remove Redis Docker container'
-  task :remove do
-    Rake::Task['redis:stop'].invoke
-    container_exists = system("docker ps -a --format '{{.Names}}' | grep -q '^#{CONTAINER_NAME}$'")
-    if container_exists
-      puts "Removing Redis container '#{CONTAINER_NAME}'..."
-      sh "docker rm #{CONTAINER_NAME}"
-      puts 'Redis container removed'
-    else
-      puts "Redis container '#{CONTAINER_NAME}' does not exist"
-    end
-  end
-
-  desc 'Ensure Redis is running (start if needed)'
+  desc 'Ensure cache is running (start if needed)'
   task :ensure do
     require 'redis'
     require_relative 'config/environment'
-    redis_url = CodePraise::App.config.REDISCLOUD_URL
+    redis_url = CodePraise::App.config.REDIS_URL
 
     redis = Redis.new(url: redis_url)
     redis.ping
-    puts 'Redis is running'
+    puts 'Cache is running'
   rescue Redis::CannotConnectError
-    puts 'Redis not running, starting Docker container...'
-    Rake::Task['redis:start'].invoke
-  end
-end
-
-namespace :cache do
-  task :config do # rubocop:disable Rake/Desc
-    require_relative 'app/infrastructure/cache/redis_cache'
-    require_relative 'config/environment' # load config info
-    @api = CodePraise::App
+    puts 'Cache not running, starting Redis container...'
+    Rake::Task['cache:redis:start'].invoke
   end
 
-  desc 'Directory listing of local dev cache'
-  task :list => :config do
-    puts 'Finding production cache'
+  desc 'List all cached keys'
+  task list: :config do
+    puts "Environment: #{@api.environment}"
     keys = CodePraise::Cache::Remote.new(@api.config).keys
-    puts 'No keys found' if keys.none?
-    keys.each { |key| puts "Key: #{key}" }
+    if keys.none?
+      puts 'No keys found'
+    else
+      keys.each { |key| puts "  #{key}" }
+    end
   end
 
-  desc 'Wipe cache'
-  task :wipe => :config do
-    print 'Are you sure you wish to wipe the production cache? (y/n) '
-    if $stdin.gets.chomp.downcase == 'y'
-      puts 'Deleting production cache'
-      wiped = CodePraise::Cache::Remote.new(@api.config).wipe
-      wiped.each { |key| puts "Wiped: #{key}" }
+  desc 'Wipe all cached keys'
+  task wipe: :config do
+    env = @api.environment
+    if env == :production
+      print 'Are you sure you wish to wipe the PRODUCTION cache? (y/n) '
+      return unless $stdin.gets.chomp.downcase == 'y'
+    end
+
+    puts "Wiping #{env} cache..."
+    wiped = CodePraise::Cache::Remote.new(@api.config).wipe
+    if wiped.empty?
+      puts 'No keys to wipe'
+    else
+      wiped.each { |key| puts "  Wiped: #{key}" }
+    end
+  end
+
+  # Redis-specific container management (for local development)
+  namespace :redis do
+    desc 'Start Redis Docker container'
+    task :start do
+      # Check if container exists
+      container_exists = system("docker ps -a --format '{{.Names}}' | grep -q '^#{REDIS_CONTAINER}$'")
+
+      if container_exists
+        # Container exists, check if running
+        container_running = system("docker ps --format '{{.Names}}' | grep -q '^#{REDIS_CONTAINER}$'")
+        if container_running
+          puts "Redis container '#{REDIS_CONTAINER}' is already running"
+        else
+          puts "Starting existing Redis container '#{REDIS_CONTAINER}'..."
+          sh "docker start #{REDIS_CONTAINER}"
+        end
+      else
+        # Create and start new container
+        puts "Creating and starting Redis container '#{REDIS_CONTAINER}'..."
+        sh "docker run -d --name #{REDIS_CONTAINER} -p 6379:6379 redis:latest"
+      end
+
+      # Wait for Redis to be ready
+      puts 'Waiting for Redis to be ready...'
+      sleep 2
+      Rake::Task['cache:status'].invoke
+    end
+
+    desc 'Stop Redis Docker container'
+    task :stop do
+      container_running = system("docker ps --format '{{.Names}}' | grep -q '^#{REDIS_CONTAINER}$'")
+      if container_running
+        puts "Stopping Redis container '#{REDIS_CONTAINER}'..."
+        sh "docker stop #{REDIS_CONTAINER}"
+        puts 'Redis container stopped'
+      else
+        puts "Redis container '#{REDIS_CONTAINER}' is not running"
+      end
+    end
+
+    desc 'Remove Redis Docker container'
+    task :remove do
+      Rake::Task['cache:redis:stop'].invoke
+      container_exists = system("docker ps -a --format '{{.Names}}' | grep -q '^#{REDIS_CONTAINER}$'")
+      if container_exists
+        puts "Removing Redis container '#{REDIS_CONTAINER}'..."
+        sh "docker rm #{REDIS_CONTAINER}"
+        puts 'Redis container removed'
+      else
+        puts "Redis container '#{REDIS_CONTAINER}' does not exist"
+      end
     end
   end
 end
 
 namespace :queues do
-  task :config do
+  task :config do # rubocop:disable Rake/Desc
     require 'aws-sdk-sqs'
     require_relative 'config/environment' # load config info
     @api = CodePraise::App
@@ -238,26 +245,28 @@ namespace :queues do
       secret_access_key: @api.config.AWS_SECRET_ACCESS_KEY,
       region: @api.config.AWS_REGION
     )
-    @q_name = @api.config.CLONE_QUEUE
-    @q_url = @sqs.get_queue_url(queue_name: @q_name).queue_url
-
+    @q_name = @api.config.WORKER_QUEUE
     puts "Environment: #{@api.environment}"
+  end
+
+  task :get_url => :config do # rubocop:disable Rake/Desc
+    @q_url = @sqs.get_queue_url(queue_name: @q_name).queue_url
   end
 
   desc 'Create SQS queue for worker'
   task :create => :config do
-    @sqs.create_queue(queue_name: @q_name)
+    result = @sqs.create_queue(queue_name: @q_name)
 
     puts 'Queue created:'
     puts "  Name: #{@q_name}"
     puts "  Region: #{@api.config.AWS_REGION}"
-    puts "  URL: #{@q_url}"
+    puts "  URL: #{result.queue_url}"
   rescue StandardError => e
     puts "Error creating queue: #{e}"
   end
 
   desc 'Report status of queue for worker'
-  task :status => :config do
+  task :status => :get_url do
     puts 'Queue info:'
     puts "  Name: #{@q_name}"
     puts "  Region: #{@api.config.AWS_REGION}"
@@ -267,7 +276,7 @@ namespace :queues do
   end
 
   desc 'Purge messages in SQS queue for worker'
-  task :purge => :config do
+  task :purge => :get_url do
     @sqs.purge_queue(queue_url: @q_url)
     puts "Queue #{@q_name} purged"
   rescue StandardError => e

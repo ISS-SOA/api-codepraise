@@ -47,14 +47,14 @@ describe 'Unit test of Cache::Remote' do
   end
 
   describe 'keys' do
-    it 'should list all keys with test prefix' do
+    it 'should list all keys in the database' do
       @cache.set('key1', 'value1', ttl: 3600)
       @cache.set('key2', 'value2', ttl: 3600)
 
       keys = @cache.keys
-      # In test environment, keys are prefixed with 'test:'
-      _(keys).must_include 'test:key1'
-      _(keys).must_include 'test:key2'
+      # Environment isolation via separate Redis databases (no key prefixes)
+      _(keys).must_include 'key1'
+      _(keys).must_include 'key2'
       _(keys.length).must_equal 2
     end
   end

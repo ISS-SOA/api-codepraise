@@ -68,7 +68,7 @@ module CodePraise
         return Success(input) if input[:cache_hit]
 
         # Cache miss - send request to worker
-        Messaging::Queue.new(App.config.CLONE_QUEUE_URL, App.config)
+        Messaging::Queue.new(App.config.WORKER_QUEUE_URL, App.config)
           .send(appraisal_request_json(input))
 
         Failure(Response::ApiResult.new(
