@@ -5,8 +5,6 @@ require 'logger'
 require 'rack/session'
 require 'roda'
 require 'sequel'
-require 'rack/cache'
-require 'redis-rack-cache'
 
 module CodePraise
   # Environment-specific configuration
@@ -23,24 +21,6 @@ module CodePraise
 
     configure :development, :production do
       plugin :common_logger, $stderr
-    end
-
-    # Setup Cacheing mechanism
-    configure :development do
-      use Rack::Cache,
-          verbose: true,
-          metastore: "#{config.LOCAL_CACHE}/meta",
-          entitystore: "#{config.LOCAL_CACHE}/body"
-    end
-
-    configure :production do
-      puts 'RUNNING IN PRODUCTION MODE'
-      # Set DATABASE_URL environment variable on production platform
-
-      use Rack::Cache,
-          verbose: true,
-          metastore: "#{config.REDISCLOUD_URL}/0/metastore",
-          entitystore: "#{config.REDISCLOUD_URL}/0/entitystore"
     end
 
     # Automated HTTP stubbing for testing only

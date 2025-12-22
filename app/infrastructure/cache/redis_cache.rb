@@ -4,11 +4,10 @@ require 'redis'
 
 module CodePraise
   module Cache
-    # Redis client utility for caching with TTL support
+    # Redis client utility for caching appraisal results with TTL support
     # Uses key prefixes to separate namespaces:
-    # - 'appraisal:' prefix for appraisal cache
-    # - 'test:appraisal:' prefix for test environment
-    # This avoids conflicts with Rack::Cache which uses its own key patterns
+    # - 'appraisal:' prefix for appraisal cache (production/development)
+    # - 'test:appraisal:' prefix for test environment isolation
     class Remote
       def initialize(config)
         @redis = Redis.new(url: config.REDISCLOUD_URL)

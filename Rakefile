@@ -38,7 +38,7 @@ end
 
 desc 'Keep restarting web app in dev mode upon changes'
 task :rerun do
-  sh "rerun -c --ignore 'coverage/*' --ignore 'repostore/*' --ignore '_cache/*' -- bundle exec puma -p 9090"
+  sh "rerun -c --ignore 'coverage/*' --ignore 'repostore/*'' -- bundle exec puma -p 9090"
 end
 
 namespace :db do
@@ -204,47 +204,26 @@ end
 
 namespace :cache do
   task :config do # rubocop:disable Rake/Desc
-    require_relative 'app/infrastructure/cache/local_cache'
     require_relative 'app/infrastructure/cache/redis_cache'
     require_relative 'config/environment' # load config info
     @api = CodePraise::App
   end
 
   desc 'Directory listing of local dev cache'
-  namespace :list do
-    desc 'Lists development cache'
-    task :dev => :config do
-      puts 'Lists development cache'
-      keys = CodePraise::Cache::Local.new(@api.config).keys
-      puts 'No local cache found' if keys.none?
-      keys.each { |key| puts "Key: #{key}" }
-    end
-
-    desc 'Lists production cache'
-    task :production => :config do
-      puts 'Finding production cache'
-      keys = CodePraise::Cache::Remote.new(@api.config).keys
-      puts 'No keys found' if keys.none?
-      keys.each { |key| puts "Key: #{key}" }
-    end
+  task :list => :config do
+    puts 'Finding production cache'
+    keys = CodePraise::Cache::Remote.new(@api.config).keys
+    puts 'No keys found' if keys.none?
+    keys.each { |key| puts "Key: #{key}" }
   end
 
-  namespace :wipe do
-    desc 'Delete development cache'
-    task :dev => :config do
-      puts 'Deleting development cache'
-      CodePraise::Cache::Local.new(@api.config).wipe
-      puts 'Development cache wiped'
-    end
-
-    desc 'Delete production cache'
-    task :production => :config do
-      print 'Are you sure you wish to wipe the production cache? (y/n) '
-      if $stdin.gets.chomp.downcase == 'y'
-        puts 'Deleting production cache'
-        wiped = CodePraise::Cache::Remote.new(@api.config).wipe
-        wiped.each { |key| puts "Wiped: #{key}" }
-      end
+  desc 'Wipe cache'
+  task :wipe => :config do
+    print 'Are you sure you wish to wipe the production cache? (y/n) '
+    if $stdin.gets.chomp.downcase == 'y'
+      puts 'Deleting production cache'
+      wiped = CodePraise::Cache::Remote.new(@api.config).wipe
+      wiped.each { |key| puts "Wiped: #{key}" }
     end
   end
 end
