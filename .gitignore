@@ -1,5 +1,5 @@
-.claude/
-CLAUDE.md
+.claude/_*
+.claude/settings.local.json
 CLAUDE.local.md
 _snippets/
 .bundle/
