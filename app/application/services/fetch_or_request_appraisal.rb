@@ -92,8 +92,7 @@ module CodePraise
           input[:project],
           input[:requested].folder_name || '',
           input[:request_id]
-        ).then { Representer::AppraisalRequest.new(_1) }
-          .then(&:to_json)
+        ).then { Representer::AppraisalRequest.new(it).to_json }
       end
 
       def log_error(error)

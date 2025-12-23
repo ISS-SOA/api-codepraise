@@ -33,7 +33,6 @@ module CodePraise
             # GET /projects/{owner_name}/{project_name}[/folder_namepath/]
             routing.get do
               # Appraisal results cached in Redis by worker (1-day TTL)
-              # No HTTP caching needed - Redis is the source of truth
               request_id = [request.env, request.path, Time.now.to_f].hash
 
               path_request = Request::ProjectPath.new(
@@ -47,21 +46,16 @@ module CodePraise
               )
 
               if result.failure?
+                # Failure includes appraisal request being processed by worker
                 failed = Representer::HttpResponse.new(result.failure)
                 routing.halt failed.http_status_code, failed.to_json
               end
 
               # Cache hit - return pre-serialized JSON directly
               appraisal_result = result.value!
-              if appraisal_result[:cache_hit]
-                response.status = 200
-                appraisal_result[:cached_json]
-              else
-                # Should not reach here - success means cache hit
-                # Worker requests return Failure with :processing status
-                response.status = 200
-                appraisal_result[:cached_json]
-              end
+              response.status = appraisal_result[:cache_hit] ? 200 : 500
+
+              appraisal_result[:cached_json]
             end
 
             # POST /projects/{owner_name}/{project_name}

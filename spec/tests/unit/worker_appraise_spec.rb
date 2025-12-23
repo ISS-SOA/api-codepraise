@@ -4,7 +4,7 @@ require_relative '../../helpers/spec_helper'
 require_relative '../../helpers/cache_helper'
 require_relative '../../../workers/application/services/appraise_project'
 
-describe 'Unit test of Worker::AppraiseProject' do
+describe 'Unit test of Appraiser::Service::AppraiseProject' do
   before do
     @cache = CacheHelper.create_test_cache
     CacheHelper.wipe_cache(@cache)
@@ -35,7 +35,7 @@ describe 'Unit test of Worker::AppraiseProject' do
 
   describe 'build_project_entity helper' do
     it 'should convert OpenStruct to Entity::Project' do
-      service = Worker::AppraiseProject.new
+      service = Appraiser::Service::AppraiseProject.new
 
       # Access private method for testing
       entity = service.send(:build_project_entity, @project_ostruct)
@@ -48,7 +48,7 @@ describe 'Unit test of Worker::AppraiseProject' do
     end
 
     it 'should handle empty contributors' do
-      service = Worker::AppraiseProject.new
+      service = Appraiser::Service::AppraiseProject.new
       entity = service.send(:build_project_entity, @project_ostruct)
 
       _(entity.contributors).must_equal []
@@ -59,7 +59,7 @@ describe 'Unit test of Worker::AppraiseProject' do
         OpenStruct.new(origin_id: 789, username: 'contributor1', email: 'c1@example.com')
       ]
 
-      service = Worker::AppraiseProject.new
+      service = Appraiser::Service::AppraiseProject.new
       entity = service.send(:build_project_entity, @project_ostruct)
 
       _(entity.contributors.length).must_equal 1
@@ -69,22 +69,22 @@ describe 'Unit test of Worker::AppraiseProject' do
 
   describe 'scale_clone_progress helper' do
     it 'should scale Cloning to 25' do
-      service = Worker::AppraiseProject.new
+      service = Appraiser::Service::AppraiseProject.new
       _(service.send(:scale_clone_progress, 'Cloning into...')).must_equal 25
     end
 
     it 'should scale Receiving to 40' do
-      service = Worker::AppraiseProject.new
+      service = Appraiser::Service::AppraiseProject.new
       _(service.send(:scale_clone_progress, 'Receiving objects: 50%')).must_equal 40
     end
 
     it 'should scale Checking to 50' do
-      service = Worker::AppraiseProject.new
+      service = Appraiser::Service::AppraiseProject.new
       _(service.send(:scale_clone_progress, 'Checking connectivity...')).must_equal 50
     end
 
     it 'should default unknown stages to 30' do
-      service = Worker::AppraiseProject.new
+      service = Appraiser::Service::AppraiseProject.new
       _(service.send(:scale_clone_progress, 'Unknown stage')).must_equal 30
     end
   end

@@ -33,12 +33,7 @@ module Appraiser
 
     def perform(_sqs_msg, request)
       job = JobReporter.new(request, Worker.config)
-
-      if appraisal_request?(request)
-        perform_appraisal(job)
-      else
-        perform_clone_only(job)
-      end
+      perform_appraisal(job)
     rescue CodePraise::GitRepo::Errors::CannotOverwriteLocalGitRepo
       # worker should crash fail early - only catch errors we expect!
       puts 'CLONE EXISTS -- ignoring request'
@@ -46,16 +41,10 @@ module Appraiser
 
     private
 
-    # Check if this is the new AppraisalRequest format
-    def appraisal_request?(request)
-      JSON.parse(request).key?('folder_path')
-    end
-
-    # New flow: clone + appraise + cache
     def perform_appraisal(job)
       gitrepo = CodePraise::GitRepo.new(job.project, Worker.config)
 
-      ::Worker::AppraiseProject.new.call(
+      Service::AppraiseProject.new.call(
         project: job.project,
         folder_path: job.folder_path,
         config: Worker.config,
@@ -65,17 +54,6 @@ module Appraiser
 
       # Keep sending finished status to any latecoming subscribers
       job.report_each_second(5) { AppraisalMonitor.finished_percent }
-    end
-
-    # Legacy flow: clone only (for backwards compatibility)
-    def perform_clone_only(job)
-      job.report(CloneMonitor.starting_percent)
-      CodePraise::GitRepo.new(job.project, Worker.config).clone_locally do |line|
-        job.report CloneMonitor.progress(line)
-      end
-
-      # Keep sending finished status to any latecoming subscribers
-      job.report_each_second(5) { CloneMonitor.finished_percent }
     end
   end
 end
