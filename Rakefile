@@ -8,10 +8,13 @@ task :default do
 end
 
 desc 'Run unit and integration tests'
-Rake::TestTask.new(:spec) do |t|
+Rake::TestTask.new(:spec_only) do |t|
   t.pattern = 'spec/tests/**/*_spec.rb'
   t.warning = false
 end
+
+# Run specs with cache check
+task spec: ['cache:ensure', :spec_only]
 
 desc 'Keep rerunning unit/integration tests upon changes'
 task :respec do
@@ -35,7 +38,7 @@ end
 
 desc 'Keep restarting web app in dev mode upon changes'
 task :rerun do
-  sh "rerun -c --ignore 'coverage/*' --ignore 'repostore/*' --ignore '_cache/*' -- bundle exec puma -p 9090"
+  sh "rerun -c --ignore 'coverage/*' --ignore 'repostore/*'' -- bundle exec puma -p 9090"
 end
 
 namespace :db do
@@ -109,54 +112,131 @@ namespace :repos do
 end
 
 namespace :cache do
+  REDIS_CONTAINER = 'redis-codepraise'
+
   task :config do # rubocop:disable Rake/Desc
-    require_relative 'app/infrastructure/cache/local_cache'
-    require_relative 'app/infrastructure/cache/redis_cache'
-    require_relative 'config/environment' # load config info
+    require 'redis'
+    require_relative 'config/environment'
+    require_relative 'app/infrastructure/cache/remote_cache'
     @api = CodePraise::App
   end
 
-  desc 'Directory listing of local dev cache'
-  namespace :list do
-    desc 'Lists development cache'
-    task :dev => :config do
-      puts 'Lists development cache'
-      keys = CodePraise::Cache::Local.new(@api.config).keys
-      puts 'No local cache found' if keys.none?
-      keys.each { |key| puts "Key: #{key}" }
-    end
+  desc 'Check cache server connectivity'
+  task status: :config do
+    redis_url = @api.config.REDIS_URL
+    puts "Environment: #{@api.environment}"
+    puts "Checking cache at: #{redis_url}"
+    redis = Redis.new(url: redis_url)
+    response = redis.ping
+    puts "Cache responded: #{response}"
+    puts 'Cache connection successful!'
+  rescue Redis::CannotConnectError => e
+    puts "Cache connection FAILED: #{e.message}"
+    puts ''
+    puts 'To start Redis locally:'
+    puts '  rake cache:redis:start'
+    exit 1
+  end
 
-    desc 'Lists production cache'
-    task :production => :config do
-      puts 'Finding production cache'
-      keys = CodePraise::Cache::Remote.new(@api.config).keys
-      puts 'No keys found' if keys.none?
-      keys.each { |key| puts "Key: #{key}" }
+  desc 'Ensure cache is running (start if needed)'
+  task :ensure do
+    require 'redis'
+    require_relative 'config/environment'
+    redis_url = CodePraise::App.config.REDIS_URL
+
+    redis = Redis.new(url: redis_url)
+    redis.ping
+    puts 'Cache is running'
+  rescue Redis::CannotConnectError
+    puts 'Cache not running, starting Redis container...'
+    Rake::Task['cache:redis:start'].invoke
+  end
+
+  desc 'List all cached keys'
+  task list: :config do
+    puts "Environment: #{@api.environment}"
+    keys = CodePraise::Cache::Remote.new(@api.config).keys
+    if keys.none?
+      puts 'No keys found'
+    else
+      keys.each { |key| puts "  #{key}" }
     end
   end
 
-  namespace :wipe do
-    desc 'Delete development cache'
-    task :dev => :config do
-      puts 'Deleting development cache'
-      CodePraise::Cache::Local.new(@api.config).wipe
-      puts 'Development cache wiped'
+  desc 'Wipe all cached keys'
+  task wipe: :config do
+    env = @api.environment
+    if env == :production
+      print 'Are you sure you wish to wipe the PRODUCTION cache? (y/n) '
+      return unless $stdin.gets.chomp.downcase == 'y'
     end
 
-    desc 'Delete production cache'
-    task :production => :config do
-      print 'Are you sure you wish to wipe the production cache? (y/n) '
-      if $stdin.gets.chomp.downcase == 'y'
-        puts 'Deleting production cache'
-        wiped = CodePraise::Cache::Remote.new(@api.config).wipe
-        wiped.each { |key| puts "Wiped: #{key}" }
+    puts "Wiping #{env} cache..."
+    wiped = CodePraise::Cache::Remote.new(@api.config).wipe
+    if wiped.empty?
+      puts 'No keys to wipe'
+    else
+      wiped.each { |key| puts "  Wiped: #{key}" }
+    end
+  end
+
+  # Redis-specific container management (for local development)
+  namespace :redis do
+    desc 'Start Redis Docker container'
+    task :start do
+      # Check if container exists
+      container_exists = system("docker ps -a --format '{{.Names}}' | grep -q '^#{REDIS_CONTAINER}$'")
+
+      if container_exists
+        # Container exists, check if running
+        container_running = system("docker ps --format '{{.Names}}' | grep -q '^#{REDIS_CONTAINER}$'")
+        if container_running
+          puts "Redis container '#{REDIS_CONTAINER}' is already running"
+        else
+          puts "Starting existing Redis container '#{REDIS_CONTAINER}'..."
+          sh "docker start #{REDIS_CONTAINER}"
+        end
+      else
+        # Create and start new container
+        puts "Creating and starting Redis container '#{REDIS_CONTAINER}'..."
+        sh "docker run -d --name #{REDIS_CONTAINER} -p 6379:6379 redis:latest"
+      end
+
+      # Wait for Redis to be ready
+      puts 'Waiting for Redis to be ready...'
+      sleep 2
+      Rake::Task['cache:status'].invoke
+    end
+
+    desc 'Stop Redis Docker container'
+    task :stop do
+      container_running = system("docker ps --format '{{.Names}}' | grep -q '^#{REDIS_CONTAINER}$'")
+      if container_running
+        puts "Stopping Redis container '#{REDIS_CONTAINER}'..."
+        sh "docker stop #{REDIS_CONTAINER}"
+        puts 'Redis container stopped'
+      else
+        puts "Redis container '#{REDIS_CONTAINER}' is not running"
+      end
+    end
+
+    desc 'Remove Redis Docker container'
+    task :remove do
+      Rake::Task['cache:redis:stop'].invoke
+      container_exists = system("docker ps -a --format '{{.Names}}' | grep -q '^#{REDIS_CONTAINER}$'")
+      if container_exists
+        puts "Removing Redis container '#{REDIS_CONTAINER}'..."
+        sh "docker rm #{REDIS_CONTAINER}"
+        puts 'Redis container removed'
+      else
+        puts "Redis container '#{REDIS_CONTAINER}' does not exist"
       end
     end
   end
 end
 
 namespace :queues do
-  task :config do
+  task :config do # rubocop:disable Rake/Desc
     require 'aws-sdk-sqs'
     require_relative 'config/environment' # load config info
     @api = CodePraise::App
@@ -165,26 +245,28 @@ namespace :queues do
       secret_access_key: @api.config.AWS_SECRET_ACCESS_KEY,
       region: @api.config.AWS_REGION
     )
-    @q_name = @api.config.CLONE_QUEUE
-    @q_url = @sqs.get_queue_url(queue_name: @q_name).queue_url
-
+    @q_name = @api.config.WORKER_QUEUE
     puts "Environment: #{@api.environment}"
+  end
+
+  task :get_url => :config do # rubocop:disable Rake/Desc
+    @q_url = @sqs.get_queue_url(queue_name: @q_name).queue_url
   end
 
   desc 'Create SQS queue for worker'
   task :create => :config do
-    @sqs.create_queue(queue_name: @q_name)
+    result = @sqs.create_queue(queue_name: @q_name)
 
     puts 'Queue created:'
     puts "  Name: #{@q_name}"
     puts "  Region: #{@api.config.AWS_REGION}"
-    puts "  URL: #{@q_url}"
+    puts "  URL: #{result.queue_url}"
   rescue StandardError => e
     puts "Error creating queue: #{e}"
   end
 
   desc 'Report status of queue for worker'
-  task :status => :config do
+  task :status => :get_url do
     puts 'Queue info:'
     puts "  Name: #{@q_name}"
     puts "  Region: #{@api.config.AWS_REGION}"
@@ -194,7 +276,7 @@ namespace :queues do
   end
 
   desc 'Purge messages in SQS queue for worker'
-  task :purge => :config do
+  task :purge => :get_url do
     @sqs.purge_queue(queue_url: @q_url)
     puts "Queue #{@q_name} purged"
   rescue StandardError => e
@@ -206,17 +288,17 @@ namespace :worker do
   namespace :run do
     desc 'Run the background cloning worker in development mode'
     task :dev => :config do
-      sh 'RACK_ENV=development bundle exec shoryuken -r ./workers/git_clone_worker.rb -C ./workers/shoryuken_dev.yml'
+      sh 'RACK_ENV=development bundle exec shoryuken -r ./workers/application/controllers/worker.rb -C ./workers/shoryuken_dev.yml'
     end
 
     desc 'Run the background cloning worker in testing mode'
     task :test => :config do
-      sh 'RACK_ENV=test bundle exec shoryuken -r ./workers/git_clone_worker.rb -C ./workers/shoryuken_test.yml'
+      sh 'RACK_ENV=test bundle exec shoryuken -r ./workers/application/controllers/worker.rb -C ./workers/shoryuken_test.yml'
     end
 
     desc 'Run the background cloning worker in production mode'
     task :production => :config do
-      sh 'RACK_ENV=production bundle exec shoryuken -r ./workers/git_clone_worker.rb -C ./workers/shoryuken.yml'
+      sh 'RACK_ENV=production bundle exec shoryuken -r ./workers/application/controllers/worker.rb -C ./workers/shoryuken.yml'
     end
   end
 end

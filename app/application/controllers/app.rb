@@ -32,33 +32,30 @@ module CodePraise
           routing.on String, String do |owner_name, project_name|
             # GET /projects/{owner_name}/{project_name}[/folder_namepath/]
             routing.get do
-              App.configure :production do
-                response.cache_control public: true, max_age: 300
-              end
-
+              # Appraisal results cached in Redis by worker (1-day TTL)
               request_id = [request.env, request.path, Time.now.to_f].hash
 
               path_request = Request::ProjectPath.new(
                 owner_name, project_name, request
               )
 
-              result = Service::AppraiseProject.new.call(
+              result = Service::FetchOrRequestAppraisal.new.call(
                 requested: path_request,
-                request_id: request_id,
+                request_id:,
                 config: App.config
               )
 
               if result.failure?
+                # Failure includes appraisal request being processed by worker
                 failed = Representer::HttpResponse.new(result.failure)
                 routing.halt failed.http_status_code, failed.to_json
               end
 
-              http_response = Representer::HttpResponse.new(result.value!)
-              response.status = http_response.http_status_code
+              # Cache hit - return pre-serialized JSON directly
+              appraisal_result = result.value!
+              response.status = appraisal_result[:cache_hit] ? 200 : 500
 
-              Representer::ProjectFolderContributions.new(
-                result.value!.message
-              ).to_json
+              appraisal_result[:cached_json]
             end
 
             # POST /projects/{owner_name}/{project_name}

@@ -1,5 +1,6 @@
 .claude/
 CLAUDE.md
+CLAUDE.local.md
 _snippets/
 .bundle/
 config/secrets.yml
@@ -7,4 +8,4 @@ coverage/*
 !coverage/.resultset.json
 *.db
 repostore/**/
-_cache/
+spec/logs/

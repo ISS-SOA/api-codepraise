@@ -21,7 +21,7 @@ module CodePraise
 
       ## Sends message to queue
       # Usage:
-      #   q = Messaging::Queue.new(App.config.CLONE_QUEUE_URL)
+      #   q = Messaging::Queue.new(App.config.WORKER_QUEUE_URL)
       #   q.send({data: "hello"}.to_json)
       def send(message)
         @queue.send_message(message_body: message)
@@ -29,7 +29,7 @@ module CodePraise
 
       ## Polls queue, yielding each messge
       # Usage:
-      #   q = Messaging::Queue.new(App.config.CLONE_QUEUE_URL)
+      #   q = Messaging::Queue.new(App.config.WORKER_QUEUE_URL)
       #   q.poll { |msg| print msg.body.to_s }
       def poll
         poller = Aws::SQS::QueuePoller.new(@queue_url)

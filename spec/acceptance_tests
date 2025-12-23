@@ -2,9 +2,26 @@
 # see: https://stackoverflow.com/questions/360201/how-do-i-kill-background-processes-jobs-when-my-shell-script-exits
 trap "kill 0" EXIT
 
-# Run application server as backround process (using '&')
-# see: https://kb.iu.edu/d/afnz
-rake worker:run:test &
+# Ensure cache (Redis) is running
+echo "Checking cache..."
+bundle exec rake cache:ensure
 
-# Run acceptance tests on browser
+# Create logs directory if needed (gitignored via spec/logs/)
+mkdir -p spec/logs
+
+# Run worker as background process, redirecting output to log file
+# see: https://kb.iu.edu/d/afnz
+echo "Starting worker (output in spec/logs/worker.log)..."
+rake worker:run:test > spec/logs/worker.log 2>&1 &
+
+# Give worker time to start
+sleep 2
+
+# Run acceptance tests
+echo "Running tests..."
 bundle exec rake spec
+
+# Show worker log summary
+echo ""
+echo "=== Worker Log Summary ==="
+grep -E "(INFO:|ERROR:|Progress:.*100)" spec/logs/worker.log 2>/dev/null | tail -20 || echo "No worker log found"

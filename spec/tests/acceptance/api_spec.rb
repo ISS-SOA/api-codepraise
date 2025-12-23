@@ -3,6 +3,7 @@
 require_relative '../../helpers/spec_helper'
 require_relative '../../helpers/vcr_helper'
 require_relative '../../helpers/database_helper'
+require_relative '../../helpers/cache_helper'
 require 'rack/test'
 
 def app
@@ -18,10 +19,12 @@ describe 'Test API routes' do
     VcrHelper.configure_vcr_for_github
     DatabaseHelper.wipe_database
     CodePraise::Repository::RepoStore.wipe
+    CacheHelper.wipe_cache
   end
 
   after do
     VcrHelper.eject_vcr
+    CacheHelper.wipe_cache
   end
 
   describe 'Root route' do
@@ -49,7 +52,8 @@ describe 'Test API routes' do
       get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}"
       _(last_response.status).must_equal 200
       appraisal = JSON.parse last_response.body
-      _(appraisal.keys.sort).must_equal %w[folder project]
+      _(appraisal['status']).must_equal 'ok'
+      _(appraisal['folder_path']).must_equal ''
       _(appraisal['project']['name']).must_equal PROJECT_NAME
       _(appraisal['project']['owner']['username']).must_equal USERNAME
       _(appraisal['project']['contributors'].count).must_equal 3
@@ -72,7 +76,8 @@ describe 'Test API routes' do
       get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}/spec"
       _(last_response.status).must_equal 200
       appraisal = JSON.parse last_response.body
-      _(appraisal.keys.sort).must_equal %w[folder project]
+      _(appraisal['status']).must_equal 'ok'
+      _(appraisal['folder_path']).must_equal 'spec'
       _(appraisal['project']['name']).must_equal PROJECT_NAME
       _(appraisal['project']['owner']['username']).must_equal USERNAME
       _(appraisal['project']['contributors'].count).must_equal 3
@@ -92,9 +97,12 @@ describe 'Test API routes' do
 
       5.times { sleep(1); print('_') }
 
+      # Error appraisals are cached with status 'error'
       get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}/foobar"
-      _(last_response.status).must_equal 404
-      _(JSON.parse(last_response.body)['status']).must_include 'not'
+      _(last_response.status).must_equal 200
+      appraisal = JSON.parse last_response.body
+      _(appraisal['status']).must_equal 'error'
+      _(appraisal['error_type']).wont_be_nil
     end
 
     it 'should be report error for an invalid project' do
