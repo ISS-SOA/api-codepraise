@@ -62,7 +62,7 @@ module Appraiser
         folder_path: job.folder_path || '',
         config: Worker.config,
         gitrepo: gitrepo,
-        progress: progress_mapper.progress_callback
+        progress: progress_mapper
       )
 
       # Keep sending finished status to any latecoming subscribers

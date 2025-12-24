@@ -42,9 +42,5 @@ module Appraiser
       end
     end
 
-    # Returns a proc that can be passed to services for progress reporting
-    def progress_callback
-      ->(symbol) { report(symbol) }
-    end
   end
 end
