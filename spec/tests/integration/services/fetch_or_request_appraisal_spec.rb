@@ -42,7 +42,8 @@ describe 'FetchOrRequestAppraisal Service Integration Test' do
         owner_name: USERNAME,
         project_name: PROJECT_NAME,
         project_fullname: "#{USERNAME}/#{PROJECT_NAME}",
-        folder_name: ''
+        folder_name: '',
+        cache_key: cache_key
       )
 
       result = CodePraise::Service::FetchOrRequestAppraisal.new.call(
@@ -69,7 +70,8 @@ describe 'FetchOrRequestAppraisal Service Integration Test' do
         owner_name: USERNAME,
         project_name: PROJECT_NAME,
         project_fullname: "#{USERNAME}/#{PROJECT_NAME}",
-        folder_name: ''
+        folder_name: '',
+        cache_key: "appraisal:#{USERNAME}/#{PROJECT_NAME}/"
       )
 
       # Mock the queue to avoid actual SQS calls
@@ -100,7 +102,8 @@ describe 'FetchOrRequestAppraisal Service Integration Test' do
         owner_name: USERNAME,
         project_name: PROJECT_NAME,
         project_fullname: "#{USERNAME}/#{PROJECT_NAME}",
-        folder_name: ''
+        folder_name: '',
+        cache_key: "appraisal:#{USERNAME}/#{PROJECT_NAME}/"
       )
 
       result = CodePraise::Service::FetchOrRequestAppraisal.new.call(
@@ -138,7 +141,8 @@ describe 'FetchOrRequestAppraisal Service Integration Test' do
         owner_name: USERNAME,
         project_name: PROJECT_NAME,
         project_fullname: "#{USERNAME}/#{PROJECT_NAME}",
-        folder_name: ''
+        folder_name: '',
+        cache_key: "appraisal:#{USERNAME}/#{PROJECT_NAME}/"
       )
 
       result = CodePraise::Service::FetchOrRequestAppraisal.new.call(

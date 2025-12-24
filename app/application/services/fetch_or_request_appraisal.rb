@@ -47,9 +47,8 @@ module CodePraise
 
       def check_cache(input)
         cache = Cache::Remote.new(input[:config])
-        cache_key = appraisal_cache_key(input)
 
-        cached_json = cache.get(cache_key)
+        cached_json = cache.get(input[:requested].cache_key)
         return Success(input) unless cached_json
 
         # Cache hit - return the cached JSON directly
@@ -67,9 +66,9 @@ module CodePraise
         # If cache hit, we're done - return success with cached data
         return Success(input) if input[:cache_hit]
 
-        # Cache miss - send request to worker
+        # Cache miss - send job to worker
         Messaging::Queue.new(App.config.WORKER_QUEUE_URL, App.config)
-          .send(appraisal_request_json(input))
+          .send(appraisal_job_json(input))
 
         Failure(Response::ApiResult.new(
           status: :processing,
@@ -82,17 +81,12 @@ module CodePraise
 
       # Helper methods
 
-      def appraisal_cache_key(input)
-        folder_path = input[:requested].folder_name || ''
-        "appraisal:#{input[:project].fullname}/#{folder_path}"
-      end
-
-      def appraisal_request_json(input)
-        Response::AppraisalRequest.new(
+      def appraisal_job_json(input)
+        Messaging::AppraisalJob.new(
           input[:project],
           input[:requested].folder_name || '',
           input[:request_id]
-        ).then { Representer::AppraisalRequest.new(it).to_json }
+        ).then { Representer::AppraisalJob.new(it).to_json }
       end
 
       def log_error(error)

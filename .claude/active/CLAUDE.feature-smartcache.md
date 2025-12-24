@@ -114,22 +114,31 @@ Client → API → Check Redis cache (project root key)
 - [x] Decide on location for extraction logic (Representer)
 - [x] Document decisions in this file
 
-### Phase 2: Refactor - Create `Request::AppraisalRequest`
+### Phase 2: Refactor - Create `Request::Appraisal` and `Messaging::AppraisalJob` ✅
 
-**Replace `Request::ProjectPath` with `Request::AppraisalRequest`:**
+**Replace `Request::ProjectPath` with `Request::Appraisal`:**
 
-- [ ] Create `Request::AppraisalRequest` in `app/application/requests/`
+- [x] Create `Request::Appraisal` in `app/application/requests/`
   - Subsumes `ProjectPath` functionality (owner_name, project_name, folder_name)
   - Add `project_fullname` method
-  - Add `root_cache_key` method (`appraisal:{owner}/{project}/`)
-  - Add `folder_cache_key` method (`appraisal:{owner}/{project}/{folder}`)
+  - Add `cache_key` method (single source of truth)
   - Add `root_request?` helper
-- [ ] Update controller to use `Request::AppraisalRequest` instead of `ProjectPath`
-- [ ] Update `Service::FetchOrRequestAppraisal` to use request's cache key methods
-- [ ] Remove duplicate `appraisal_cache_key` helper from service
-- [ ] Delete old `Request::ProjectPath` (or keep as alias if needed)
-- [ ] Update/add unit tests for `Request::AppraisalRequest`
-- [ ] Verify all existing tests pass (no behavior change yet)
+- [x] Update controller to use `Request::Appraisal` instead of `ProjectPath`
+- [x] Update `Service::FetchOrRequestAppraisal` to use `request.cache_key`
+- [x] Remove duplicate `appraisal_cache_key` helper from service
+- [x] Delete old `Request::ProjectPath`
+- [x] Add unit tests for `Request::Appraisal`
+
+**Consolidate worker job DTO:**
+
+- [x] Create `Messaging::AppraisalJob` in `app/infrastructure/messaging/`
+- [x] Create `Representer::AppraisalJob` (replaces `AppraisalRequest`)
+- [x] Update service to use `Messaging::AppraisalJob`
+- [x] Update worker `JobReporter` to use new naming
+- [x] Delete legacy `Response::CloneRequest` and `Response::AppraisalRequest`
+- [x] Delete legacy `Representer::CloneRequest` and `Representer::AppraisalRequest`
+- [x] Update tests and documentation
+- [x] Verify all existing tests pass (88 tests, 0 failures)
 
 ### Phase 3: Representer Subfolder Extraction
 
@@ -180,11 +189,23 @@ Client → API → Check Redis cache (project root key)
   - Q3: Extraction logic in Representer (presentation layer) - keeps entity worker-only
   - Q4: Tree traversal is O(depth); Roar `from_json` handles nested deserialization automatically
   - Q5: Cache invalidation unchanged; smart cache simplifies (one key per project)
-  - Q6: Create `Request::AppraisalRequest` subsuming `ProjectPath` with cache key methods
+  - Q6: Create `Request::Appraisal` subsuming `ProjectPath` with cache key methods
 - Made 5 decisions (see Decisions Made section)
-- Refined Implementation Phases (6 phases) with Phase 2 as AppraisalRequest refactor
-- Committed: `a8c21df` - docs: reorganize Claude documentation and add feature planning
-- **Status**: Phase 1 (Analysis & Design) COMPLETE; ready for Phase 2
+- Refined Implementation Phases (6 phases) with Phase 2 as refactor
+- Committed: `8c020a3` - docs: complete Phase 1 planning for smart cache feature
+- **Status**: Phase 1 COMPLETE
+
+### Session 2
+
+- Implemented Phase 2 refactoring:
+  - Created `Request::Appraisal` (replaces `Request::ProjectPath`)
+  - Created `Messaging::AppraisalJob` DTO (replaces `Response::AppraisalRequest`)
+  - Created `Representer::AppraisalJob` (replaces `Representer::AppraisalRequest`)
+  - Updated controller, service, and worker to use new objects
+  - Deleted legacy code: `CloneRequest`, `AppraisalRequest` (response/representer)
+  - Updated CLAUDE.md documentation
+  - All 88 tests passing
+- **Status**: Phase 2 COMPLETE; ready for Phase 3
 
 ---
 
@@ -239,23 +260,33 @@ Client → API → Check Redis cache (project root key)
   - Webhook-based invalidation on GitHub push
   - Manual wipe + re-appraisal workflow
 
-### Decision 5: Create `Request::AppraisalRequest` Subsuming `ProjectPath`
+### Decision 5: Create `Request::Appraisal` Subsuming `ProjectPath`
 
-- New `Request::AppraisalRequest` object will replace `Request::ProjectPath`
+- New `Request::Appraisal` object replaces `Request::ProjectPath`
+- **Naming**: `Request::Appraisal` (not `Request::AppraisalRequest` - avoids redundancy)
+  - Clean pairing: `Request::Appraisal` (what client asks for) vs `Value::Appraisal` (what worker produces)
 - Owns cache key generation as single source of truth
 - Provides:
   - `owner_name`, `project_name`, `folder_name` (from ProjectPath)
   - `project_fullname` method
-  - `root_cache_key` method (`appraisal:{owner}/{project}/`)
-  - `folder_cache_key` method (`appraisal:{owner}/{project}/{folder}`)
+  - `cache_key` method (currently folder-specific, will become root-only)
   - `root_request?` helper
 - **Rationale**:
   - Semantic clarity: Request (what is asked for) vs Appraisal (result of work)
   - Removes duplicate cache key logic from service
   - Centralizes "what is being requested" concept
-  - Awkward to call `Value::Appraisal` before appraisal work is done
-- **Implementation**: Refactor in Phase 2 before smart cache feature work
+  - Stays in application layer where request objects belong
+- **Implementation**: Completed in Phase 2
 - **Note**: `Value::Appraisal#cache_key` remains for worker use (result caching)
+
+### Decision 6: Create `Messaging::AppraisalJob` for Worker Queue
+
+- New `Messaging::AppraisalJob` DTO replaces `Response::AppraisalRequest`
+- **Naming**: "Job" clarifies it's a work payload, not a response
+- **Location**: `app/infrastructure/messaging/` (alongside Queue)
+- **Pattern**: Data Transfer Object (DTO) for SQS transport
+- Serialized via `Representer::AppraisalJob`
+- **Cleanup**: Deleted legacy `CloneRequest` and associated representer
 
 ---
 

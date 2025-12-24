@@ -145,7 +145,7 @@ API: Check Redis cache
     ↓ (hit)
 Return cached JSON ──→ Client
     ↓ (miss)
-Send AppraisalRequest to SQS → Return 202 Processing
+Send AppraisalJob to SQS → Return 202 Processing
     ↓
 Worker receives request
     ↓
@@ -232,10 +232,14 @@ Organized into bounded contexts with **immutable value objects** using `Dry::Str
   - `MemberMapper`: GitHub JSON → `Entity::Member`
 
 **Messaging (`app/infrastructure/messaging/`):**
+
 - **Queue** (`queue.rb`): AWS SQS queue wrapper
-  - Sends clone requests to background worker
+  - Sends appraisal jobs to background worker
   - Polls queue for messages (used by worker)
   - Requires AWS credentials: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
+- **AppraisalJob** (`appraisal_job.rb`): DTO for worker job payload
+  - Contains: project (Entity), folder_path, id (request_id)
+  - Serialized via `Representer::AppraisalJob` for SQS transport
 
 **3. Application Layer (`app/application/`)**
 
@@ -247,12 +251,12 @@ Organized into bounded contexts with **immutable value objects** using `Dry::Str
 - `FetchOrRequestAppraisal`: Checks Redis cache, dispatches to worker if miss
   - Steps: `find_project_details`, `check_project_eligibility`, `check_cache`, `request_appraisal_worker`
   - Cache hit: Returns pre-serialized JSON from Redis
-  - Cache miss: Sends AppraisalRequest to SQS, returns `processing` status
+  - Cache miss: Sends AppraisalJob to SQS, returns `processing` status
 - `ListProjects`: Returns list of stored projects
   - Steps: `validate_list`, `retrieve_list`
 
 **Requests (`app/application/requests/`):**
-- `ProjectPath`: Parses route parameters for project appraisal
+- `Appraisal`: Parses route parameters for project appraisal, generates cache keys
 - `EncodedProjectList`: Encodes/decodes base64 JSON project lists
 
 **Responses (`app/application/responses/`):**
@@ -275,7 +279,7 @@ Organized into bounded contexts with **immutable value objects** using `Dry::Str
 - `Project`: Serializes `Entity::Project` to JSON with hypermedia links
 - `ProjectsList`: Serializes collection of projects
 - `Appraisal`: Serializes `Value::Appraisal` with status wrapper (used by worker)
-- `AppraisalRequest`: Serializes request payload sent to worker via SQS
+- `AppraisalJob`: Serializes job payload sent to worker via SQS
 - `FolderContributions`: Serializes folder-level contributions
 - `FileContributions`: Serializes file-level contributions
 - `Contributor`: Serializes contributor data
@@ -284,12 +288,6 @@ Organized into bounded contexts with **immutable value objects** using `Dry::Str
 - `CreditShare`: Serializes credit distribution
 - `FilePath`: Serializes file path information
 - `OpenStructWithLinks`: Helper for hypermedia links
-
-**Responses (`app/presentation/responses/`):**
-
-- Simple data structures for passing between layers
-- `CloneRequest`: Legacy request format for clone-only operations
-- `AppraisalRequest`: Request format with full project info + folder path
 
 **Key differences from traditional web app:**
 - **NO HTML templates** (no Slim views)
@@ -371,7 +369,7 @@ workers/
 **Worker Application Layer (`workers/application/`):**
 
 - `controllers/worker.rb`: Main Shoryuken worker class (`Appraiser::Worker`)
-  - Receives AppraisalRequest from SQS queue
+  - Receives AppraisalJob from SQS queue
   - Dispatches to `Appraiser::Service::AppraiseProject` service
   - Reports progress via Faye websockets
 
@@ -382,7 +380,7 @@ workers/
   - Stores serialized JSON in Redis with TTL
 
 - `requests/job_reporter.rb`: Manages progress reporting
-  - Deserializes AppraisalRequest from JSON
+  - Deserializes AppraisalJob from JSON
   - Publishes progress updates to Faye channel
 
 **Worker Infrastructure Layer (`workers/infrastructure/`):**
@@ -436,7 +434,7 @@ Frontend clients subscribe to channels matching their `request_id` to receive re
 2. API checks Redis cache for existing result
 3. If cache hit: return cached JSON immediately (200)
 4. If cache miss:
-   - API sends AppraisalRequest to SQS queue
+   - API sends AppraisalJob to SQS queue
    - API returns 202 Processing with request_id
    - Client subscribes to Faye channel /{request_id}
 5. Worker picks up job from SQS
@@ -502,7 +500,7 @@ Service steps:
      - Cache::Remote.get(cache_key)
      - If hit: return pre-serialized JSON immediately
   4. request_appraisal_worker (cache miss only)
-     - Send AppraisalRequest to SQS with full project info
+     - Send AppraisalJob to SQS with full project info
      - Return Failure(:processing) with request_id
   ↓
 Controller receives Success or Failure
@@ -514,7 +512,7 @@ Cache miss: Return 202 Processing with request_id
 **Worker processes appraisal (async):**
 
 ```
-Worker receives AppraisalRequest from SQS
+Worker receives AppraisalJob from SQS
   ↓
 Appraiser::Service::AppraiseProject steps:
   1. prepare_inputs - convert OpenStruct to Entity::Project
