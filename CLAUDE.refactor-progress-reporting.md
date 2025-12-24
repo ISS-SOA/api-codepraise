@@ -126,31 +126,31 @@ C. **Simplify**: Only report major phases, skip line-by-line git progress
 
 ## Implementation Phases
 
-### Phase 1: Restructure Faye Infrastructure
+### Phase 1: Restructure Faye Infrastructure ✅
 
 **Rename folder**: `workers/infrastructure/messaging/` → `workers/infrastructure/faye/`
 
 **Rename file**: `progress_publisher.rb` → `faye_server.rb`
 
-- [ ] Rename class `ProgressPublisher` → `FayeServer`
-- [ ] Keep same interface: `publish(message)`
-- [ ] This is pure infrastructure - no logic changes
+- [x] Rename class `ProgressPublisher` → `FayeServer`
+- [x] Keep same interface: `publish(message)`
+- [x] This is pure infrastructure - no logic changes
 
 **New file**: `workers/infrastructure/faye/progress_mapper.rb`
 
-- [ ] Create `Appraiser::ProgressMapper` class
-- [ ] Define `PHASES` hash (single source of truth for all symbol → percentage mappings)
-- [ ] Include all phases: `:started`, `:clone_receiving`, `:clone_resolving`, `:clone_done`, `:appraising`, `:appraise_done`, `:caching`, `:finished`
-- [ ] Implement `map(symbol) → percentage` method
-- [ ] Accept FayeServer in constructor for dependency injection
-- [ ] Implement `report(symbol)` that maps and publishes via FayeServer
+- [x] Create `Appraiser::ProgressMapper` class
+- [x] Define `PHASES` hash (single source of truth for all symbol → percentage mappings)
+- [x] Include all phases: `:started`, `:clone_receiving`, `:clone_resolving`, `:clone_done`, `:appraising`, `:appraise_done`, `:caching`, `:finished`
+- [x] Implement `map(symbol) → percentage` method
+- [x] Accept FayeServer in constructor for dependency injection
+- [x] Implement `report(symbol)` that maps and publishes via FayeServer
 
 **New file**: `workers/infrastructure/git/mappers/clone_mapper.rb`
 
-- [ ] Create `CloneMapper` class (or module)
-- [ ] Parse git clone output lines into symbols
-- [ ] Map: `"Receiving..."` → `:clone_receiving`, `"Resolving..."` → `:clone_resolving`, etc.
-- [ ] Return symbol that ProgressMapper can translate to percentage
+- [x] Create `CloneMapper` module
+- [x] Parse git clone output lines into symbols
+- [x] Map: `"Receiving..."` → `:clone_receiving`, `"Resolving..."` → `:clone_resolving`, etc.
+- [x] Return symbol that ProgressMapper can translate to percentage
 
 ### Phase 2: Update Service to Use Symbols
 
@@ -240,6 +240,12 @@ ProgressMapper.new(config, channel_id)  # created with FayeServer
     ↓
 Service::AppraiseProject.call(progress: mapper.progress_callback)
 ```
+
+### Decision 5: Symbol Naming Convention
+
+- Use `-ing` suffix for ongoing action phases: `cloning_*`, `appraising_*`, `caching_*`
+- Symbols: `:started`, `:cloning_started`, `:cloning_remote`, `:cloning_receiving`, `:cloning_resolving`, `:cloning_done`, `:appraising_started`, `:appraising_done`, `:caching_started`, `:finished`
+- **Rationale**: Consistent naming that describes ongoing actions; more readable and descriptive
 
 ### Decision 3: Git Clone Progress with CloneMapper
 

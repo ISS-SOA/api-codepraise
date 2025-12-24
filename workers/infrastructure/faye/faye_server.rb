@@ -3,8 +3,8 @@
 require 'http'
 
 module Appraiser
-  # Publishes progress as percent to Faye endpoint
-  class ProgressPublisher
+  # Gateway to Faye server for publishing progress messages
+  class FayeServer
     def initialize(config, channel_id)
       @config = config
       @channel_id = channel_id
