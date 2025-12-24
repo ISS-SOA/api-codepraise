@@ -150,22 +150,25 @@ Client → API → Check Redis cache (project root key)
 - [x] Handle edge cases: root path (empty string), path not found, trailing slashes
 - [x] Unit tests for extraction methods (16 tests in `folder_contributions_extraction_spec.rb`)
 
-### Phase 4: Worker Modifications
+### Phase 4: Smart Cache Key and Worker Request ✅
 
-**Modify worker to always appraise root folder:**
+**API owns smart cache strategy; worker remains general-purpose:**
 
-- [ ] Update `Appraiser::Service::AppraiseProject` to ignore folder_path, always appraise root
-- [ ] Update `Value::Appraisal#cache_key` for root-only behavior
-- [ ] Update worker unit tests
+- [x] Update `Request::Appraisal#cache_key` for root-only behavior
+  - `cache_key` now always returns root key: `appraisal:{owner}/{project}/`
+  - `folder_name` still available for subfolder extraction
+- [x] Update `FetchOrRequestAppraisal` to always send root to worker
+  - Added `ROOT_FOLDER_PATH = ''` constant in API service
+  - Worker receives root path, appraises faithfully
+- [x] Worker unchanged - remains general-purpose (appraises whatever folder it's told)
+- [x] Update unit tests for smart cache behavior
 
-### Phase 5: API Service Modifications
+### Phase 5: API Service Subfolder Extraction
 
-**Modify `FetchOrRequestAppraisal` to use smart cache:**
+**Modify `FetchOrRequestAppraisal` to extract subfolders from cache:**
 
-- [ ] Change cache lookup to use `request.root_cache_key`
 - [ ] On cache hit: extract requested subfolder from cached root JSON
 - [ ] Handle subfolder-not-found (return 404)
-- [ ] On cache miss: send AppraisalRequest (worker will appraise root)
 - [ ] Update service unit/integration tests
 
 ### Phase 6: Cleanup & Testing
@@ -223,7 +226,14 @@ Client → API → Check Redis cache (project root key)
   - Created JSON fixtures in `spec/fixtures/json/` (not wiped by `vcr:wipe`)
   - Added 16 unit tests in `folder_contributions_extraction_spec.rb`
   - All 93 tests passing (77 original + 16 new)
-- **Status**: Phase 3 COMPLETE; ready for Phase 4
+- Implemented Phase 4 smart cache (API-owned strategy):
+  - `Request::Appraisal#cache_key` now always returns root key
+  - `FetchOrRequestAppraisal` always sends root folder_path to worker
+  - Worker unchanged - remains general-purpose (appraises whatever it's told)
+  - Design: API owns smart cache strategy; worker stays simple
+  - Updated unit tests for smart cache behavior
+  - All 93 tests passing
+- **Status**: Phase 4 COMPLETE; ready for Phase 5
 
 ---
 

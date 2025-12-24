@@ -81,10 +81,13 @@ module CodePraise
 
       # Helper methods
 
+      # Smart cache: always request root appraisal from worker
+      ROOT_FOLDER_PATH = ''
+
       def appraisal_job_json(input)
         Messaging::AppraisalJob.new(
           input[:project],
-          input[:requested].folder_name || '',
+          ROOT_FOLDER_PATH,
           input[:request_id]
         ).then { Representer::AppraisalJob.new(it).to_json }
       end

@@ -66,8 +66,9 @@ describe 'Unit test of Request::Appraisal' do
       _(@request.folder_name).must_equal 'app/domain'
     end
 
-    it 'should generate correct cache_key with folder' do
-      _(@request.cache_key).must_equal 'appraisal:testowner/test-project/app/domain'
+    it 'should generate root cache_key (smart cache)' do
+      # Smart cache: always use root key regardless of folder_name
+      _(@request.cache_key).must_equal 'appraisal:testowner/test-project/'
     end
 
     it 'should not identify as root request' do
@@ -91,13 +92,29 @@ describe 'Unit test of Request::Appraisal' do
       _(@request.folder_name).must_equal 'app/domain/contributions/entities'
     end
 
-    it 'should generate correct cache_key for nested folder' do
-      _(@request.cache_key).must_equal 'appraisal:ISS-SOA/codepraise-api/app/domain/contributions/entities'
+    it 'should generate root cache_key for nested folder (smart cache)' do
+      # Smart cache: always use root key regardless of folder depth
+      _(@request.cache_key).must_equal 'appraisal:ISS-SOA/codepraise-api/'
     end
   end
 
-  describe 'cache key format consistency' do
-    it 'should match Value::Appraisal cache key format for root' do
+  describe 'smart cache key behavior' do
+    it 'should always use root cache key for any folder request' do
+      mock_request = MockRodaRequest.new(
+        captures: %w[testowner test-project],
+        remaining_path: '/some/deep/nested/path'
+      )
+
+      request = CodePraise::Request::Appraisal.new(
+        'testowner', 'test-project', mock_request
+      )
+
+      # Smart cache: cache key is always root, regardless of requested folder
+      _(request.cache_key).must_equal 'appraisal:testowner/test-project/'
+      _(request.folder_name).must_equal 'some/deep/nested/path'
+    end
+
+    it 'should match Value::Appraisal root cache key format' do
       mock_request = MockRodaRequest.new(
         captures: %w[testowner test-project],
         remaining_path: ''
@@ -107,22 +124,8 @@ describe 'Unit test of Request::Appraisal' do
         'testowner', 'test-project', mock_request
       )
 
-      # Both should produce same format: appraisal:{owner}/{project}/
+      # Both Request::Appraisal and Value::Appraisal use same root key format
       _(request.cache_key).must_equal 'appraisal:testowner/test-project/'
-    end
-
-    it 'should match Value::Appraisal cache key format for subfolder' do
-      mock_request = MockRodaRequest.new(
-        captures: %w[testowner test-project],
-        remaining_path: '/some/path'
-      )
-
-      request = CodePraise::Request::Appraisal.new(
-        'testowner', 'test-project', mock_request
-      )
-
-      # Both should produce same format: appraisal:{owner}/{project}/{folder}
-      _(request.cache_key).must_equal 'appraisal:testowner/test-project/some/path'
     end
   end
 end

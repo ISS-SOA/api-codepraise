@@ -24,9 +24,9 @@ module CodePraise
         @request.captures.join '/'
       end
 
-      # Cache key for this request (currently folder-specific, will become root-only)
+      # Cache key for project appraisal (always root - smart cache)
       def cache_key
-        "#{CACHE_KEY_PREFIX}:#{project_fullname}/#{folder_name}"
+        "#{CACHE_KEY_PREFIX}:#{project_fullname}/"
       end
 
       # Is this a request for the root folder?
