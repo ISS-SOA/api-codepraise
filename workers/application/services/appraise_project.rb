@@ -19,7 +19,7 @@ module Appraiser
       # folder_path: String path to folder being appraised
       # config: Worker config with Redis URL
       # gitrepo: GitRepo instance
-      # progress: Proc to report progress
+      # progress: Proc to report progress (accepts symbols, not percentages)
 
       def prepare_inputs(input)
         # Convert OpenStruct project to Entity::Project for Value::Appraisal
@@ -31,15 +31,15 @@ module Appraiser
       end
 
       def clone_repo(input)
-        input[:progress].call(15) # STARTED
+        input[:progress].call(:started)
 
         if input[:gitrepo].exists_locally?
-          input[:progress].call(50) # Skip to post-clone
+          input[:progress].call(:cloning_done)
         else
           input[:gitrepo].clone_locally do |line|
-            # Scale clone progress from 15 to 50
-            percent = scale_clone_progress(line)
-            input[:progress].call(percent)
+            # Use CloneMapper to convert git output to progress symbol
+            symbol = CodePraise::CloneMapper.map_or_default(line)
+            input[:progress].call(symbol)
           end
         end
 
@@ -60,13 +60,13 @@ module Appraiser
         # Skip if already errored in clone step
         return Success(input) if input[:appraisal]&.error?
 
-        input[:progress].call(55) # Starting appraisal
+        input[:progress].call(:appraising_started)
 
         folder = CodePraise::Mapper::Contributions
           .new(input[:gitrepo])
           .for_folder(input[:folder_path])
 
-        input[:progress].call(85) # Appraisal complete
+        input[:progress].call(:appraising_done)
 
         # Build successful appraisal value object
         input[:appraisal] = CodePraise::Value::Appraisal.success(
@@ -90,7 +90,7 @@ module Appraiser
       end
 
       def cache_result(input)
-        input[:progress].call(90) # Caching
+        input[:progress].call(:caching_started)
 
         appraisal = input[:appraisal]
         json = CodePraise::Representer::Appraisal.new(appraisal).to_json
@@ -98,31 +98,17 @@ module Appraiser
         cache = CodePraise::Cache::Remote.new(input[:config])
         cache.set(appraisal.cache_key, json, ttl: appraisal.ttl)
 
-        input[:progress].call(100) # FINISHED
+        input[:progress].call(:finished)
 
         Success(input)
       rescue StandardError => e
-        # Cache failure - still report 100% so client can retry
+        # Cache failure - still report finished so client can retry
         puts "CACHE ERROR: #{e.message}"
-        input[:progress].call(100)
+        input[:progress].call(:finished)
         Success(input)
       end
 
       private
-
-      # Scale git clone progress (15-50 range)
-      def scale_clone_progress(line)
-        clone_stages = {
-          'Cloning'   => 25,
-          'remote'    => 35,
-          'Receiving' => 40,
-          'Resolving' => 45,
-          'Checking'  => 50
-        }
-
-        first_word = line.match(/^[A-Za-z]+/).to_s
-        clone_stages[first_word] || 30
-      end
 
       # Convert OpenStruct project (from JSON) to Entity::Project
       def build_project_entity(project_ostruct)

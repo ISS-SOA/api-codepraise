@@ -152,32 +152,33 @@ C. **Simplify**: Only report major phases, skip line-by-line git progress
 - [x] Map: `"Receiving..."` → `:clone_receiving`, `"Resolving..."` → `:clone_resolving`, etc.
 - [x] Return symbol that ProgressMapper can translate to percentage
 
-### Phase 2: Update Service to Use Symbols
+### Phase 2: Update Service to Use Symbols ✅
 
 **Modify**: `workers/application/services/appraise_project.rb`
 
-- [ ] Change all `input[:progress].call(15)` → `input[:progress].call(:started)`
-- [ ] Remove `scale_clone_progress` method
-- [ ] Use CloneMapper to convert git output lines to symbols
-- [ ] Use symbols throughout: `:started`, `:clone_receiving`, `:clone_done`, `:appraising`, etc.
+- [x] Change all `input[:progress].call(15)` → `input[:progress].call(:started)`
+- [x] Remove `scale_clone_progress` method
+- [x] Use CloneMapper to convert git output lines to symbols
+- [x] Use symbols throughout: `:started`, `:cloning_receiving`, `:cloning_done`, `:appraising_started`, etc.
+- [x] Update tests: Replace `scale_clone_progress` tests with `CloneMapper` tests
 
-### Phase 3: Update Worker Controller
+### Phase 3: Update Worker Controller ✅
 
 **Modify**: `workers/application/controllers/worker.rb`
 
-- [ ] Move job JSON deserialization from JobReporter to controller
-- [ ] Create ProgressMapper with FayeServer and channel_id
-- [ ] Pass `progress_mapper.progress_callback` to service
-- [ ] Update `report_each_second` logic to use ProgressMapper with `:finished` symbol
+- [x] Move job JSON deserialization from JobReporter to controller
+- [x] Create ProgressMapper with FayeServer and channel_id
+- [x] Pass `progress_mapper.progress_callback` to service
+- [x] Update `report_each_second` logic to use ProgressMapper with `:finished` symbol
 
-### Phase 4: Cleanup
+### Phase 4: Cleanup ✅
 
-- [ ] Delete `workers/application/requests/job_reporter.rb`
-- [ ] Delete `workers/presentation/values/progress_monitor.rb`
+- [x] Delete `workers/application/requests/job_reporter.rb`
+- [x] Delete `workers/presentation/values/progress_monitor.rb`
   - `CloneMonitor` module (marked as legacy)
   - `AppraisalMonitor` module (replaced by ProgressMapper)
-- [ ] Update `require_worker.rb` for new file locations
-- [ ] Update tests for new symbol-based interface
+- [x] `require_worker.rb` already updated in Phase 1
+- [x] Tests updated in Phase 2 (CloneMapper tests replace scale_clone_progress tests)
 
 ## Open Questions
 

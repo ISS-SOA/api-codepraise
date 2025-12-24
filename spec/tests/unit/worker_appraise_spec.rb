@@ -67,26 +67,39 @@ describe 'Unit test of Appraiser::Service::AppraiseProject' do
     end
   end
 
-  describe 'scale_clone_progress helper' do
-    it 'should scale Cloning to 25' do
-      service = Appraiser::Service::AppraiseProject.new
-      _(service.send(:scale_clone_progress, 'Cloning into...')).must_equal 25
-    end
+end
 
-    it 'should scale Receiving to 40' do
-      service = Appraiser::Service::AppraiseProject.new
-      _(service.send(:scale_clone_progress, 'Receiving objects: 50%')).must_equal 40
-    end
+describe 'Unit test of CodePraise::CloneMapper' do
+  it 'should map Cloning to :cloning_started' do
+    _(CodePraise::CloneMapper.map('Cloning into...')).must_equal :cloning_started
+  end
 
-    it 'should scale Checking to 50' do
-      service = Appraiser::Service::AppraiseProject.new
-      _(service.send(:scale_clone_progress, 'Checking connectivity...')).must_equal 50
-    end
+  it 'should map remote: to :cloning_remote' do
+    _(CodePraise::CloneMapper.map('remote: Counting objects')).must_equal :cloning_remote
+  end
 
-    it 'should default unknown stages to 30' do
-      service = Appraiser::Service::AppraiseProject.new
-      _(service.send(:scale_clone_progress, 'Unknown stage')).must_equal 30
-    end
+  it 'should map Receiving to :cloning_receiving' do
+    _(CodePraise::CloneMapper.map('Receiving objects: 50%')).must_equal :cloning_receiving
+  end
+
+  it 'should map Resolving to :cloning_resolving' do
+    _(CodePraise::CloneMapper.map('Resolving deltas: 100%')).must_equal :cloning_resolving
+  end
+
+  it 'should map Checking to :cloning_done' do
+    _(CodePraise::CloneMapper.map('Checking connectivity...')).must_equal :cloning_done
+  end
+
+  it 'should return nil for unknown lines' do
+    _(CodePraise::CloneMapper.map('Unknown stage')).must_be_nil
+  end
+
+  it 'should return default for unknown lines with map_or_default' do
+    _(CodePraise::CloneMapper.map_or_default('Unknown stage')).must_equal :cloning_started
+  end
+
+  it 'should return custom default when specified' do
+    _(CodePraise::CloneMapper.map_or_default('Unknown', :custom)).must_equal :custom
   end
 end
 

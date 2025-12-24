@@ -31,9 +31,11 @@ module Appraiser
     Shoryuken.sqs_client_receive_message_opts = { wait_time_seconds: 20 }
     shoryuken_options queue: config.WORKER_QUEUE_URL, auto_delete: true
 
-    def perform(_sqs_msg, request)
-      job = JobReporter.new(request, Worker.config)
-      perform_appraisal(job)
+    def perform(_sqs_msg, request_json)
+      job = deserialize_job(request_json)
+      progress_mapper = build_progress_mapper(job.id)
+
+      perform_appraisal(job, progress_mapper)
     rescue CodePraise::GitRepo::Errors::CannotOverwriteLocalGitRepo
       # worker should crash fail early - only catch errors we expect!
       puts 'CLONE EXISTS -- ignoring request'
@@ -41,19 +43,30 @@ module Appraiser
 
     private
 
-    def perform_appraisal(job)
+    def deserialize_job(request_json)
+      CodePraise::Representer::AppraisalJob
+        .new(OpenStruct.new)
+        .from_json(request_json)
+    end
+
+    def build_progress_mapper(channel_id)
+      faye_server = FayeServer.new(Worker.config, channel_id)
+      ProgressMapper.new(faye_server)
+    end
+
+    def perform_appraisal(job, progress_mapper)
       gitrepo = CodePraise::GitRepo.new(job.project, Worker.config)
 
       Service::AppraiseProject.new.call(
         project: job.project,
-        folder_path: job.folder_path,
+        folder_path: job.folder_path || '',
         config: Worker.config,
         gitrepo: gitrepo,
-        progress: job.progress_callback
+        progress: progress_mapper.progress_callback
       )
 
       # Keep sending finished status to any latecoming subscribers
-      job.report_each_second(5) { AppraisalMonitor.finished_percent }
+      progress_mapper.report_each_second(5, :finished)
     end
   end
 end
