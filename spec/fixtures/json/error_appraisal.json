@@ -1,0 +1,8 @@
+{
+  "status": "error",
+  "project": {
+    "name": "test-project"
+  },
+  "error_type": "invalid_project",
+  "message": "Project not found"
+}

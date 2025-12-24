@@ -140,15 +140,15 @@ Client → API → Check Redis cache (project root key)
 - [x] Update tests and documentation
 - [x] Verify all existing tests pass (88 tests, 0 failures)
 
-### Phase 3: Representer Subfolder Extraction
+### Phase 3: Representer Subfolder Extraction ✅
 
 **Add extraction methods to `Representer::FolderContributions`:**
 
-- [ ] Add `find_subfolder(root_ostruct, folder_path)` - tree traversal helper
-- [ ] Add `extract_subfolder(json_string, folder_path)` - returns OpenStruct or nil
-- [ ] Add `extract_subfolder_json(json_string, folder_path)` - returns JSON string or nil
-- [ ] Handle edge cases: root path (empty string), path not found, trailing slashes
-- [ ] Unit tests for extraction methods
+- [x] Add `find_subfolder(root_ostruct, folder_path)` - tree traversal helper
+- [x] Add `extract_subfolder(json_string, folder_path)` - returns OpenStruct or nil
+- [x] Add `extract_subfolder_json(json_string, folder_path)` - returns JSON string or nil
+- [x] Handle edge cases: root path (empty string), path not found, trailing slashes
+- [x] Unit tests for extraction methods (16 tests in `folder_contributions_extraction_spec.rb`)
 
 ### Phase 4: Worker Modifications
 
@@ -210,7 +210,20 @@ Client → API → Check Redis cache (project root key)
   - `rake spec:all` runs all tests including acceptance (88 tests, requires worker)
   - `bash spec/acceptance_tests` starts worker and calls `spec:all`
   - Updated CLAUDE.md testing documentation
-- **Status**: Phase 2 COMPLETE; ready for Phase 3
+- Committed: `cfac067` - tests: restructure test tasks for worker-independent development
+- **Status**: Phase 2 COMPLETE
+
+### Session 3
+
+- Implemented Phase 3 subfolder extraction:
+  - Added `extract_subfolder(json_string, folder_path)` class method to `Representer::FolderContributions`
+  - Added `extract_subfolder_json(json_string, folder_path)` for JSON string output
+  - Added private `find_subfolder` tree traversal helper
+  - Handles edge cases: root path, nil, trailing/leading slashes, non-existent folders, error appraisals
+  - Created JSON fixtures in `spec/fixtures/json/` (not wiped by `vcr:wipe`)
+  - Added 16 unit tests in `folder_contributions_extraction_spec.rb`
+  - All 93 tests passing (77 original + 16 new)
+- **Status**: Phase 3 COMPLETE; ready for Phase 4
 
 ---
 
