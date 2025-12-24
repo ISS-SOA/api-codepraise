@@ -1,6 +1,6 @@
 .claude/_*
 .claude/settings.local.json
-CLAUDE.*.md
+CLAUDE.local.md
 _snippets/
 .bundle/
 config/secrets.yml
