@@ -17,9 +17,9 @@ rake worker:run:test > spec/logs/worker.log 2>&1 &
 # Give worker time to start
 sleep 2
 
-# Run acceptance tests
-echo "Running tests..."
-bundle exec rake spec
+# Run all tests (unit + integration + acceptance)
+echo "Running all tests..."
+bundle exec rake spec:all
 
 # Show worker log summary
 echo ""

@@ -7,14 +7,26 @@ task :default do
   puts `rake -T`
 end
 
-desc 'Run unit and integration tests'
-Rake::TestTask.new(:spec_only) do |t|
-  t.pattern = 'spec/tests/**/*_spec.rb'
-  t.warning = false
+namespace :spec do
+  # Internal tasks (no desc = hidden from rake -T)
+  Rake::TestTask.new(:unit_integration) do |t|
+    t.pattern = 'spec/tests/{unit,integration}/**/*_spec.rb'
+    t.warning = false
+    t.description = nil # Hide from rake -T
+  end
+
+  Rake::TestTask.new(:all_tests) do |t|
+    t.pattern = 'spec/tests/**/*_spec.rb'
+    t.warning = false
+    t.description = nil # Hide from rake -T
+  end
+
+  desc 'Run all tests (unit + integration + acceptance) - requires worker running'
+  task all: ['cache:ensure', :all_tests]
 end
 
-# Run specs with cache check
-task spec: ['cache:ensure', :spec_only]
+desc 'Run unit and integration tests (no worker required)'
+task spec: ['cache:ensure', 'spec:unit_integration']
 
 desc 'Keep rerunning unit/integration tests upon changes'
 task :respec do

@@ -205,6 +205,11 @@ Client → API → Check Redis cache (project root key)
   - Deleted legacy code: `CloneRequest`, `AppraisalRequest` (response/representer)
   - Updated CLAUDE.md documentation
   - All 88 tests passing
+- Restructured test tasks:
+  - `rake spec` now runs only unit + integration tests (77 tests, no worker required)
+  - `rake spec:all` runs all tests including acceptance (88 tests, requires worker)
+  - `bash spec/acceptance_tests` starts worker and calls `spec:all`
+  - Updated CLAUDE.md testing documentation
 - **Status**: Phase 2 COMPLETE; ready for Phase 3
 
 ---

@@ -39,12 +39,13 @@ rake cache:wipe              # Wipe all cached keys
 
 ### Testing
 ```bash
-rake spec                    # Run all tests (unit + integration only)
-bash spec/acceptance_tests   # Run full test suite with worker (recommended)
+rake spec                    # Run unit + integration tests (no worker required)
+rake spec:all                # Run all tests including acceptance (requires worker)
+bash spec/acceptance_tests   # Start worker and run full test suite (recommended)
 rake respec                  # Continuously run tests on file changes
 ```
 
-**Important:** Acceptance tests require both API and worker running. Use `bash spec/acceptance_tests` which starts the worker automatically.
+**Important:** Acceptance tests require the background worker. Use `bash spec/acceptance_tests` which starts the worker automatically, or manually run `rake worker:run:test` before `rake spec:all`.
 
 ### Running the Application
 ```bash
