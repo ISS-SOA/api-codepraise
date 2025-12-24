@@ -163,21 +163,26 @@ Client → API → Check Redis cache (project root key)
 - [x] Worker unchanged - remains general-purpose (appraises whatever folder it's told)
 - [x] Update unit tests for smart cache behavior
 
-### Phase 5: API Service Subfolder Extraction
+### Phase 5: API Service Subfolder Extraction ✅
 
 **Modify `FetchOrRequestAppraisal` to extract subfolders from cache:**
 
-- [ ] On cache hit: extract requested subfolder from cached root JSON
-- [ ] Handle subfolder-not-found (return 404)
-- [ ] Update service unit/integration tests
+- [x] On cache hit: extract requested subfolder from cached root JSON
+  - Added `extract_subfolder` and `rebuild_appraisal_json` helper methods
+  - Root requests return cached JSON unchanged
+  - Subfolder requests extract and rebuild JSON with correct `folder_path`
+- [x] Handle subfolder-not-found (return 404)
+  - Returns `NO_FOLDER_ERR` with `:not_found` status
+- [x] Update service unit/integration tests
+  - Added 2 integration tests: subfolder extraction (happy) and subfolder not found (sad)
 
-### Phase 6: Cleanup & Testing
+### Phase 6: Cleanup & Testing ✅
 
-- [ ] End-to-end acceptance tests for smart cache flow
-- [ ] Test scenarios: root request, subfolder request, nested subfolder, invalid path
-- [ ] Verify old folder-specific cache keys are ignored (TTL expiration)
-- [ ] Update `.claude/CLAUDE.md` documentation with new architecture
-- [ ] Update session log with completion status
+- [x] End-to-end acceptance tests for smart cache flow
+- [x] Test scenarios: root request, subfolder request, nested subfolder, invalid path
+- [x] Verify old folder-specific cache keys are ignored (TTL expiration)
+- [x] Update `.claude/CLAUDE.md` documentation with new architecture
+- [x] Update session log with completion status
 
 ## Session Log
 
@@ -234,6 +239,45 @@ Client → API → Check Redis cache (project root key)
   - Updated unit tests for smart cache behavior
   - All 93 tests passing
 - **Status**: Phase 4 COMPLETE; ready for Phase 5
+
+### Session 4
+
+- Implemented Phase 5 API service subfolder extraction:
+  - Added `extract_subfolder(cached_json, folder_name)` helper to `FetchOrRequestAppraisal`
+  - Added `rebuild_appraisal_json` helper for JSON reconstruction
+  - Root requests return cached JSON unchanged
+  - Subfolder requests extract, rebuild JSON with updated `folder_path` and `folder`
+  - Returns 404 when subfolder not found in cached root
+  - Design decision: Keep extraction as helper method (not separate step) - it's an implementation detail of cache lookup
+- Added 2 integration tests:
+  - HAPPY: extract subfolder from cached root on cache hit
+  - SAD: return 404 when subfolder not found in cache
+- All 95 tests passing (93 original + 2 new integration)
+- **Status**: Phase 5 COMPLETE; ready for Phase 6
+
+### Session 5
+
+- Refactored `FetchOrRequestAppraisal` to separate caching from folder extraction:
+  - Renamed `check_cache` → `check_project_appraisal_cache`
+  - Created separate step `extract_folder_from_appraisal_on_cache_hit`
+  - Renamed `request_appraisal_worker` → `request_appraisal_worker_on_cache_miss`
+  - Key insight: "folder not found" is a bad request (404), not a cache miss
+- Moved `rebuild_appraisal_json` to `Representer::Appraisal.rebuild_with_extracted_folder`
+  - Fixed `::JSON` namespace issue (avoids conflict with `Representable::JSON`)
+- Implemented Phase 6 acceptance tests:
+  - Added smart cache test: extract multiple subfolders from cached root
+  - Added invalid subfolder test: returns 404 after root is cached
+  - Used actual YPBT-app folders (spec, models, services)
+- Verified JSON fixtures in `spec/fixtures/json/` are correct and in use:
+  - `sample_appraisal.json`: used in 3 integration tests + 13 unit tests
+  - `error_appraisal.json`: used in 1 unit test (error handling)
+- Updated CLAUDE.md documentation with smart cache architecture:
+  - Updated Worker-Based Appraisal Architecture diagram
+  - Updated cache key format documentation (root-only)
+  - Updated FetchOrRequestAppraisal step names
+  - Updated data flow example for viewing contributions
+- All 107 tests passing
+- **Status**: Phase 6 COMPLETE; Smart Cache feature COMPLETE
 
 ---
 

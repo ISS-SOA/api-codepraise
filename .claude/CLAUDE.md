@@ -135,33 +135,40 @@ INFRASTRUCTURE LAYER (Database, GitHub Gateway, Git Gateway, Mappers, Cache, Mes
 DOMAIN LAYER (Entities + Values)
 ```
 
-### Worker-Based Appraisal Architecture
+### Worker-Based Appraisal Architecture (Smart Cache)
 
-Appraisal requests are processed asynchronously via background workers with Redis caching:
+Appraisal requests are processed asynchronously via background workers with Redis caching. The **smart cache** strategy caches entire project appraisals at the root level, then extracts subfolder contributions from cache on subsequent requests:
 
 ```
-Client Request
+Client Request (any folder path)
     ↓
-API: Check Redis cache
+API: Check Redis cache (root key: appraisal:{owner}/{project}/)
     ↓ (hit)
-Return cached JSON ──→ Client
+Extract requested subfolder from cached root → Return JSON ──→ Client
     ↓ (miss)
-Send AppraisalJob to SQS → Return 202 Processing
+Send AppraisalJob to SQS (always root) → Return 202 Processing
     ↓
 Worker receives request
     ↓
-Clone repo (if needed) → Appraise folder → Store JSON in Redis
+Clone repo (if needed) → Appraise ROOT folder → Store JSON in Redis
     ↓
 Notify via Faye (progress updates)
     ↓
-Client polls API → Cache hit → Return result
+Client polls API → Cache hit → Extract subfolder → Return result
 ```
+
+**Smart Cache Benefits:**
+
+- **Single worker request caches all subfolder data**: One appraisal serves all subfolder requests
+- **Subfolder requests are instant**: Extract from cached root (no worker call)
+- **Simpler cache model**: One key per project instead of many keys per folder
+- **Reduced SQS traffic**: Fewer worker requests
 
 **Key features:**
 - **Redis as primary cache**: Worker stores serialized JSON with 1-day TTL
 - **No Rack::Cache for appraisals**: Redis is the source of truth
 - **Worker does all heavy lifting**: Clone + git blame + serialization
-- **API is lightweight**: Just checks cache and dispatches requests
+- **API extracts subfolders from cache**: Lightweight extraction from cached root
 
 **Key architectural change**: The PRESENTATION layer has been restructured for Web API:
 - **NO HTML views or view objects** - removed entirely
@@ -221,7 +228,7 @@ Organized into bounded contexts with **immutable value objects** using `Dry::Str
 - **Redis Cache Client** (`Cache::Remote`): Redis client wrapper for appraisal caching
   - `get(key)`, `set(key, value, ttl:)`, `exists?(key)` methods
   - Environment isolation via separate Redis databases (no key prefixes)
-  - Appraisal cache keys: `appraisal:{owner}/{project}/{folder}`
+  - **Smart cache key format**: `appraisal:{owner}/{project}/` (root only, subfolders extracted from cached root)
 - Development: Local Redis (`redis://localhost:6379/0`)
 - Test: Local Redis (`redis://localhost:6379/1`)
 - Production: Redis cloud cache (as assigned by provider)
@@ -249,10 +256,11 @@ Organized into bounded contexts with **immutable value objects** using `Dry::Str
 - Use **Dry::Transaction** for composable service pipelines
 - `AddProject`: Fetches project from GitHub and stores in database
   - Steps: `validate_project`, `store_project`
-- `FetchOrRequestAppraisal`: Checks Redis cache, dispatches to worker if miss
-  - Steps: `find_project_details`, `check_project_eligibility`, `check_cache`, `request_appraisal_worker`
-  - Cache hit: Returns pre-serialized JSON from Redis
-  - Cache miss: Sends AppraisalJob to SQS, returns `processing` status
+- `FetchOrRequestAppraisal`: Checks Redis cache, extracts subfolder, dispatches to worker if miss
+  - Steps: `find_project_details`, `check_project_eligibility`, `check_project_appraisal_cache`, `extract_folder_from_appraisal_on_cache_hit`, `request_appraisal_worker_on_cache_miss`
+  - Cache hit: Extracts requested subfolder from cached root JSON
+  - Subfolder not found in cache: Returns 404 (not a cache miss)
+  - Cache miss: Sends AppraisalJob to SQS (always root), returns `processing` status
 - `ListProjects`: Returns list of stored projects
   - Steps: `validate_list`, `retrieve_list`
 
@@ -281,7 +289,7 @@ Organized into bounded contexts with **immutable value objects** using `Dry::Str
 - `ProjectsList`: Serializes collection of projects
 - `Appraisal`: Serializes `Value::Appraisal` with status wrapper (used by worker)
 - `AppraisalJob`: Serializes job payload sent to worker via SQS
-- `FolderContributions`: Serializes folder-level contributions
+- `FolderContributions`: Serializes folder-level contributions; includes `extract_subfolder` for smart cache
 - `FileContributions`: Serializes file-level contributions
 - `Contributor`: Serializes contributor data
 - `Member`: Serializes member/owner data
@@ -334,13 +342,14 @@ Repository::For.klass(Entity::Project).find_full_name(owner, name)
 - Representers handle hypermedia links (HATEOAS)
 - Clear separation: domain entities remain unaware of JSON serialization
 
-**Appraisal Caching (Redis):**
+**Appraisal Caching (Smart Cache with Redis):**
 
-- Worker stores serialized JSON in Redis with TTL
-- API reads cached results directly (no re-serialization)
-- Cache key format: `appraisal:{owner}/{project}/{folder}`
+- Worker stores **root folder** appraisal JSON in Redis with TTL
+- API extracts subfolders from cached root on demand
+- **Cache key format**: `appraisal:{owner}/{project}/` (root only)
 - Success TTL: 1 day (86400 seconds)
 - Error TTL: 10 seconds (allows quick retry)
+- **Subfolder extraction**: `Representer::FolderContributions.extract_subfolder` navigates cached tree
 
 **Immutable Value Objects:**
 - Domain entities are immutable via `Dry::Struct`
@@ -482,14 +491,14 @@ Representer::Project.new(project).to_json
 JSON response with 201 status
 ```
 
-**Viewing project contributions:**
+**Viewing project contributions (Smart Cache):**
 
 ```
 GET /api/v1/projects/{owner}/{name}[/{folder}]
   ↓
-Controller → Request::ProjectPath parses route parameters
+Controller → Request::Appraisal parses route parameters (owner, project, folder)
   ↓
-Controller → Service::FetchOrRequestAppraisal.call(requested: path_request)
+Controller → Service::FetchOrRequestAppraisal.call(requested: request)
   ↓
 Service steps:
   1. find_project_details
@@ -497,16 +506,22 @@ Service steps:
      - Returns Failure(:not_found) if not in database
   2. check_project_eligibility
      - Rejects projects that are too large
-  3. check_cache
-     - Cache::Remote.get(cache_key)
-     - If hit: return pre-serialized JSON immediately
-  4. request_appraisal_worker (cache miss only)
-     - Send AppraisalJob to SQS with full project info
+  3. check_project_appraisal_cache
+     - Cache::Remote.get(request.cache_key) - always root key
+     - Sets cache_hit flag if found
+  4. extract_folder_from_appraisal_on_cache_hit
+     - On cache hit: extract requested subfolder from cached root JSON
+     - Root request: return cached JSON unchanged
+     - Subfolder request: navigate tree, rebuild JSON with extracted folder
+     - Subfolder not found: Return Failure(:not_found) - bad request, not cache miss
+  5. request_appraisal_worker_on_cache_miss
+     - On cache miss: send AppraisalJob to SQS (always root folder)
      - Return Failure(:processing) with request_id
   ↓
 Controller receives Success or Failure
   ↓
-Cache hit: Return cached JSON directly (200)
+Cache hit: Return extracted/cached JSON directly (200)
+Subfolder not found: Return 404 Not Found
 Cache miss: Return 202 Processing with request_id
 ```
 

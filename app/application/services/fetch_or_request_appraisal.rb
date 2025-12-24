@@ -11,12 +11,14 @@ module CodePraise
 
       step :find_project_details
       step :check_project_eligibility
-      step :check_cache
-      step :request_appraisal_worker
+      step :check_project_appraisal_cache
+      step :extract_folder_from_appraisal_on_cache_hit
+      step :request_appraisal_worker_on_cache_miss
 
       private
 
       NO_PROJ_ERR = 'Project not found'
+      NO_FOLDER_ERR = 'Folder not found in project'
       DB_ERR = 'Having trouble accessing the database'
       REQUEST_ERR = 'Could not request appraisal'
       TOO_LARGE_ERR = 'Project is too large to analyze'
@@ -45,16 +47,15 @@ module CodePraise
         end
       end
 
-      def check_cache(input)
+      def check_project_appraisal_cache(input)
         cache = Cache::Remote.new(input[:config])
-
         cached_json = cache.get(input[:requested].cache_key)
-        return Success(input) unless cached_json
 
-        # Cache hit - return the cached JSON directly
-        # Mark as cache hit so controller knows to pass through
-        input[:cached_json] = cached_json
-        input[:cache_hit] = true
+        if cached_json
+          input[:cached_appraisal_json] = cached_json
+          input[:cache_hit] = true
+        end
+
         Success(input)
       rescue StandardError => e
         # Cache errors should not fail the request - continue to worker
@@ -62,8 +63,22 @@ module CodePraise
         Success(input)
       end
 
-      def request_appraisal_worker(input)
-        # If cache hit, we're done - return success with cached data
+      def extract_folder_from_appraisal_on_cache_hit(input)
+        # Skip extraction on cache miss - worker will handle it
+        return Success(input) unless input[:cache_hit]
+
+        folder_name = input[:requested].folder_name
+        extracted_json = extract_folder_json(input[:cached_appraisal_json], folder_name)
+
+        # Folder not found in cached appraisal - this is a bad request, not a cache miss
+        return Failure(Response::ApiResult.new(status: :not_found, message: NO_FOLDER_ERR)) unless extracted_json
+
+        input[:cached_json] = extracted_json
+        Success(input)
+      end
+
+      def request_appraisal_worker_on_cache_miss(input)
+        # Cache hit - we're done, return success with cached data
         return Success(input) if input[:cache_hit]
 
         # Cache miss - send job to worker
@@ -94,6 +109,20 @@ module CodePraise
 
       def log_error(error)
         App.logger.error [error.inspect, error.backtrace].flatten.join("\n")
+      end
+
+      # Extracts folder from cached root appraisal JSON
+      # Returns rebuilt appraisal JSON with extracted folder, or nil if not found
+      def extract_folder_json(cached_json, folder_name)
+        # Root request - return cached JSON as-is
+        return cached_json if folder_name.empty?
+
+        # Extract subfolder from cached root
+        subfolder = Representer::FolderContributions.extract_subfolder(cached_json, folder_name)
+        return nil unless subfolder
+
+        # Rebuild appraisal JSON with extracted subfolder
+        Representer::Appraisal.rebuild_with_extracted_folder(cached_json, folder_name, subfolder)
       end
     end
   end
