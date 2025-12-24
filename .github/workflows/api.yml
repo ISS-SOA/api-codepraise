@@ -58,4 +58,4 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           rake worker:run:test &
-          bundle exec rake spec
+          bundle exec rake spec:all
