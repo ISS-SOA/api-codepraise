@@ -31,6 +31,17 @@ module CodePraise
       def status
         represented.status.to_s
       end
+
+      # Rebuilds appraisal JSON with an extracted folder
+      # Used by smart cache to return subfolder from cached root appraisal
+      def self.rebuild_with_extracted_folder(appraisal_json, folder_path, folder_ostruct)
+        data = ::JSON.parse(appraisal_json)
+        data['folder_path'] = folder_path
+        data['folder'] = ::JSON.parse(FolderContributions.new(folder_ostruct).to_json)
+        ::JSON.generate(data)
+      rescue ::JSON::ParserError
+        nil
+      end
     end
   end
 end

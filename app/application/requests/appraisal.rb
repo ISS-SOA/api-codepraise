@@ -2,8 +2,11 @@
 
 module CodePraise
   module Request
-    # Application value for the path of a requested project
-    class ProjectPath
+    # Application value for an appraisal request
+    # Parses route parameters and provides cache key generation
+    class Appraisal
+      CACHE_KEY_PREFIX = 'appraisal'
+
       def initialize(owner_name, project_name, request)
         @owner_name = owner_name
         @project_name = project_name
@@ -19,6 +22,16 @@ module CodePraise
 
       def project_fullname
         @request.captures.join '/'
+      end
+
+      # Cache key for project appraisal (always root - smart cache)
+      def cache_key
+        "#{CACHE_KEY_PREFIX}:#{project_fullname}/"
+      end
+
+      # Is this a request for the root folder?
+      def root_request?
+        folder_name.empty?
       end
     end
   end

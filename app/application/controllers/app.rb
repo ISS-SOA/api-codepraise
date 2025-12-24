@@ -35,7 +35,7 @@ module CodePraise
               # Appraisal results cached in Redis by worker (1-day TTL)
               request_id = [request.env, request.path, Time.now.to_f].hash
 
-              path_request = Request::ProjectPath.new(
+              path_request = Request::Appraisal.new(
                 owner_name, project_name, request
               )
 

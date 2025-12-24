@@ -25,7 +25,7 @@ describe 'FetchOrRequestAppraisal Service Integration Test' do
   end
 
   describe 'Fetch or Request Appraisal' do
-    it 'HAPPY: should return cached JSON when cache hit' do
+    it 'HAPPY: should return cached JSON when cache hit for root request' do
       # GIVEN: a valid project in database and cached appraisal
       gh_project = CodePraise::Github::ProjectMapper
         .new(GITHUB_TOKEN)
@@ -34,15 +34,16 @@ describe 'FetchOrRequestAppraisal Service Integration Test' do
 
       # Pre-populate cache with appraisal JSON
       cache_key = "appraisal:#{USERNAME}/#{PROJECT_NAME}/"
-      cached_json = '{"status":"ok","data":{"path":"","subfolders":[]}}'
+      cached_json = File.read('spec/fixtures/json/sample_appraisal.json')
       @cache.set(cache_key, cached_json, ttl: 86_400)
 
-      # WHEN: we request appraisal
+      # WHEN: we request root appraisal
       request = OpenStruct.new(
         owner_name: USERNAME,
         project_name: PROJECT_NAME,
         project_fullname: "#{USERNAME}/#{PROJECT_NAME}",
-        folder_name: ''
+        folder_name: '',
+        cache_key: cache_key
       )
 
       result = CodePraise::Service::FetchOrRequestAppraisal.new.call(
@@ -51,10 +52,81 @@ describe 'FetchOrRequestAppraisal Service Integration Test' do
         config: @config
       )
 
-      # THEN: we should get success with cached JSON
+      # THEN: we should get success with cached JSON (unchanged for root)
       _(result.success?).must_equal true
       _(result.value![:cache_hit]).must_equal true
       _(result.value![:cached_json]).must_equal cached_json
+    end
+
+    it 'HAPPY: should extract subfolder from cached root on cache hit' do
+      # GIVEN: a valid project in database and cached root appraisal
+      gh_project = CodePraise::Github::ProjectMapper
+        .new(GITHUB_TOKEN)
+        .find(USERNAME, PROJECT_NAME)
+      CodePraise::Repository::For.entity(gh_project).create(gh_project)
+
+      # Pre-populate cache with root appraisal JSON
+      cache_key = "appraisal:#{USERNAME}/#{PROJECT_NAME}/"
+      cached_json = File.read('spec/fixtures/json/sample_appraisal.json')
+      @cache.set(cache_key, cached_json, ttl: 86_400)
+
+      # WHEN: we request a subfolder appraisal
+      request = OpenStruct.new(
+        owner_name: USERNAME,
+        project_name: PROJECT_NAME,
+        project_fullname: "#{USERNAME}/#{PROJECT_NAME}",
+        folder_name: 'app',
+        cache_key: cache_key
+      )
+
+      result = CodePraise::Service::FetchOrRequestAppraisal.new.call(
+        requested: request,
+        request_id: 'test-123',
+        config: @config
+      )
+
+      # THEN: we should get success with extracted subfolder JSON
+      _(result.success?).must_equal true
+      _(result.value![:cache_hit]).must_equal true
+
+      # Verify extracted JSON contains the subfolder data
+      extracted_data = JSON.parse(result.value![:cached_json])
+      _(extracted_data['folder_path']).must_equal 'app'
+      _(extracted_data['folder']['path']).must_equal 'app'
+      _(extracted_data['folder']['line_count']).must_equal 500
+    end
+
+    it 'SAD: should return 404 when requested subfolder not found in cache' do
+      # GIVEN: a valid project in database and cached root appraisal
+      gh_project = CodePraise::Github::ProjectMapper
+        .new(GITHUB_TOKEN)
+        .find(USERNAME, PROJECT_NAME)
+      CodePraise::Repository::For.entity(gh_project).create(gh_project)
+
+      # Pre-populate cache with root appraisal JSON
+      cache_key = "appraisal:#{USERNAME}/#{PROJECT_NAME}/"
+      cached_json = File.read('spec/fixtures/json/sample_appraisal.json')
+      @cache.set(cache_key, cached_json, ttl: 86_400)
+
+      # WHEN: we request a non-existent subfolder
+      request = OpenStruct.new(
+        owner_name: USERNAME,
+        project_name: PROJECT_NAME,
+        project_fullname: "#{USERNAME}/#{PROJECT_NAME}",
+        folder_name: 'nonexistent/path',
+        cache_key: cache_key
+      )
+
+      result = CodePraise::Service::FetchOrRequestAppraisal.new.call(
+        requested: request,
+        request_id: 'test-123',
+        config: @config
+      )
+
+      # THEN: we should get failure with not_found status
+      _(result.failure?).must_equal true
+      _(result.failure.status).must_equal :not_found
+      _(result.failure.message).must_equal 'Folder not found in project'
     end
 
     it 'HAPPY: should return processing status when cache miss' do
@@ -69,7 +141,8 @@ describe 'FetchOrRequestAppraisal Service Integration Test' do
         owner_name: USERNAME,
         project_name: PROJECT_NAME,
         project_fullname: "#{USERNAME}/#{PROJECT_NAME}",
-        folder_name: ''
+        folder_name: '',
+        cache_key: "appraisal:#{USERNAME}/#{PROJECT_NAME}/"
       )
 
       # Mock the queue to avoid actual SQS calls
@@ -100,7 +173,8 @@ describe 'FetchOrRequestAppraisal Service Integration Test' do
         owner_name: USERNAME,
         project_name: PROJECT_NAME,
         project_fullname: "#{USERNAME}/#{PROJECT_NAME}",
-        folder_name: ''
+        folder_name: '',
+        cache_key: "appraisal:#{USERNAME}/#{PROJECT_NAME}/"
       )
 
       result = CodePraise::Service::FetchOrRequestAppraisal.new.call(
@@ -138,7 +212,8 @@ describe 'FetchOrRequestAppraisal Service Integration Test' do
         owner_name: USERNAME,
         project_name: PROJECT_NAME,
         project_fullname: "#{USERNAME}/#{PROJECT_NAME}",
-        folder_name: ''
+        folder_name: '',
+        cache_key: "appraisal:#{USERNAME}/#{PROJECT_NAME}/"
       )
 
       result = CodePraise::Service::FetchOrRequestAppraisal.new.call(

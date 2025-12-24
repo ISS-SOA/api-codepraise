@@ -87,22 +87,66 @@ describe 'Test API routes' do
       _(appraisal['folder']['base_files'].count).must_equal 3
     end
 
-    it 'should be report error for an invalid subfolder' do
+    it 'should extract different subfolders from cached root (smart cache)' do
+      # Smart cache: one worker call caches root, all subfolders extracted from cache
       CodePraise::Service::AddProject.new.call(
         owner_name: USERNAME, project_name: PROJECT_NAME
       )
 
-      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}/foobar"
+      # First request for root - triggers worker
+      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}"
       _(last_response.status).must_equal 202
 
       5.times { sleep(1); print('_') }
 
-      # Error appraisals are cached with status 'error'
-      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}/foobar"
+      # Root should now be cached
+      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}"
       _(last_response.status).must_equal 200
-      appraisal = JSON.parse last_response.body
-      _(appraisal['status']).must_equal 'error'
-      _(appraisal['error_type']).wont_be_nil
+
+      # Request 'spec' subfolder - should extract from cached root (no 202)
+      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}/spec"
+      _(last_response.status).must_equal 200
+      spec_appraisal = JSON.parse last_response.body
+      _(spec_appraisal['folder_path']).must_equal 'spec'
+      _(spec_appraisal['folder']['path']).must_equal 'spec'
+
+      # Request 'models' subfolder - should also extract from cached root (no 202)
+      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}/models"
+      _(last_response.status).must_equal 200
+      models_appraisal = JSON.parse last_response.body
+      _(models_appraisal['folder_path']).must_equal 'models'
+      _(models_appraisal['folder']['path']).must_equal 'models'
+
+      # Request 'services' subfolder - should also work
+      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}/services"
+      _(last_response.status).must_equal 200
+      services_appraisal = JSON.parse last_response.body
+      _(services_appraisal['folder_path']).must_equal 'services'
+      _(services_appraisal['folder']['path']).must_equal 'services'
+    end
+
+    it 'should return 404 for an invalid subfolder after root is cached' do
+      # Smart cache: worker appraises root, API extracts subfolders
+      CodePraise::Service::AddProject.new.call(
+        owner_name: USERNAME, project_name: PROJECT_NAME
+      )
+
+      # First request triggers worker to appraise root
+      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}"
+      _(last_response.status).must_equal 202
+
+      5.times { sleep(1); print('_') }
+
+      # Wait for root to be cached
+      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}"
+      _(last_response.status).must_equal 200
+
+      # Now request invalid subfolder - should get 404 (not error appraisal)
+      get "/api/v1/projects/#{USERNAME}/#{PROJECT_NAME}/foobar"
+      _(last_response.status).must_equal 404
+      response = JSON.parse last_response.body
+      _(response['status']).must_equal 'not_found'
+      _(response['message']).must_include 'Folder not found'
     end
 
     it 'should be report error for an invalid project' do

@@ -1,0 +1,62 @@
+{
+  "status": "ok",
+  "project": {
+    "name": "test-project",
+    "fullname": "owner/test-project"
+  },
+  "folder_path": "",
+  "folder": {
+    "path": "",
+    "line_count": 1000,
+    "total_credits": 1000,
+    "any_subfolders?": true,
+    "any_base_files?": true,
+    "credit_share": {
+      "share": {
+        "dev1": 600,
+        "dev2": 400
+      }
+    },
+    "base_files": [],
+    "subfolders": [
+      {
+        "path": "app",
+        "line_count": 500,
+        "any_subfolders?": true,
+        "any_base_files?": false,
+        "subfolders": [
+          {
+            "path": "app/domain",
+            "line_count": 200,
+            "any_subfolders?": true,
+            "any_base_files?": true,
+            "subfolders": [
+              {
+                "path": "app/domain/entities",
+                "line_count": 100,
+                "any_subfolders?": false,
+                "any_base_files?": true,
+                "subfolders": []
+              }
+            ]
+          },
+          {
+            "path": "app/services",
+            "line_count": 300,
+            "any_subfolders?": false,
+            "any_base_files?": true,
+            "subfolders": []
+          }
+        ]
+      },
+      {
+        "path": "spec",
+        "line_count": 400,
+        "any_subfolders?": false,
+        "any_base_files?": true,
+        "subfolders": []
+      }
+    ],
+    "contributors": []
+  }
+}

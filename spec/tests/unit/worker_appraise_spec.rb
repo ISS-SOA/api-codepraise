@@ -90,18 +90,18 @@ describe 'Unit test of Appraiser::Service::AppraiseProject' do
   end
 end
 
-describe 'Unit test of AppraisalRequest' do
-  it 'should create AppraisalRequest struct' do
+describe 'Unit test of Messaging::AppraisalJob' do
+  it 'should create AppraisalJob struct' do
     project = OpenStruct.new(name: 'test')
-    request = CodePraise::Response::AppraisalRequest.new(project, 'app/models', 'request-123')
+    job = CodePraise::Messaging::AppraisalJob.new(project, 'app/models', 'request-123')
 
-    _(request.project.name).must_equal 'test'
-    _(request.folder_path).must_equal 'app/models'
-    _(request.id).must_equal 'request-123'
+    _(job.project.name).must_equal 'test'
+    _(job.folder_path).must_equal 'app/models'
+    _(job.id).must_equal 'request-123'
   end
 end
 
-describe 'Unit test of Representer::AppraisalRequest' do
+describe 'Unit test of Representer::AppraisalJob' do
   before do
     @owner = CodePraise::Entity::Member.new(
       id: nil,
@@ -121,11 +121,11 @@ describe 'Unit test of Representer::AppraisalRequest' do
       contributors: []
     )
 
-    @request = CodePraise::Response::AppraisalRequest.new(@project, 'app/models', 'req-123')
+    @job = CodePraise::Messaging::AppraisalJob.new(@project, 'app/models', 'req-123')
   end
 
   it 'should serialize to JSON' do
-    json = CodePraise::Representer::AppraisalRequest.new(@request).to_json
+    json = CodePraise::Representer::AppraisalJob.new(@job).to_json
     parsed = JSON.parse(json)
 
     _(parsed['folder_path']).must_equal 'app/models'
@@ -134,9 +134,9 @@ describe 'Unit test of Representer::AppraisalRequest' do
   end
 
   it 'should deserialize from JSON' do
-    json = CodePraise::Representer::AppraisalRequest.new(@request).to_json
+    json = CodePraise::Representer::AppraisalJob.new(@job).to_json
 
-    deserialized = CodePraise::Representer::AppraisalRequest
+    deserialized = CodePraise::Representer::AppraisalJob
       .new(OpenStruct.new)
       .from_json(json)
 
