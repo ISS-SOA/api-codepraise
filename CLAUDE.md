@@ -367,12 +367,10 @@ workers/
 ├── domain/contributions/           # Entities, values, lib for git analysis
 ├── infrastructure/
 │   ├── git/                        # Git gateway, repositories, mappers
-│   └── messaging/                  # Faye progress publisher
-├── presentation/values/            # Progress monitor calculations
+│   └── faye/                       # Faye server gateway and progress mapper
 ├── application/
 │   ├── controllers/worker.rb       # Shoryuken entry point
-│   ├── services/appraise_project.rb
-│   └── requests/job_reporter.rb
+│   └── services/appraise_project.rb
 └── shoryuken*.yml                  # Queue configs
 ```
 
@@ -388,10 +386,7 @@ workers/
   - Clones repo if not exists locally
   - Runs git blame analysis via `Mapper::Contributions`
   - Stores serialized JSON in Redis with TTL
-
-- `requests/job_reporter.rb`: Manages progress reporting
-  - Deserializes AppraisalJob from JSON
-  - Publishes progress updates to Faye channel
+  - Reports progress via symbols (`:started`, `:cloning_done`, `:appraising_started`, etc.)
 
 **Worker Infrastructure Layer (`workers/infrastructure/`):**
 
@@ -408,14 +403,13 @@ workers/
   - `FileContributionsMapper`: Maps file data to `Entity::FileContributions`
   - `BlameContributor`: Maps git contributor info to `Entity::Contributor`
   - `PorcelainParser`: Parses git blame porcelain format
-- `messaging/progress_publisher.rb`: Sends progress to Faye
+  - `CloneMapper`: Maps git clone output lines to progress symbols
+- `faye/faye_server.rb`: Gateway to Faye server
   - POSTs JSON messages to `/faye` endpoint
   - Channel format: `/{request_id}`
-
-**Worker Presentation Layer (`workers/presentation/`):**
-
-- `values/progress_monitor.rb`: Tracks progress phases
-  - `AppraisalMonitor`: Full appraisal progress (15-50% clone, 55-85% appraise, 90-100% cache)
+- `faye/progress_mapper.rb`: Maps progress symbols to percentages
+  - Single source of truth for all symbol → percentage mappings
+  - Symbols: `:started`, `:cloning_*`, `:appraising_*`, `:caching_*`, `:finished`
 
 **Configuration Files:**
 
@@ -655,11 +649,9 @@ Tests are organized by scope in `spec/tests/`:
 
 - Contributions domain (git analysis) → `workers/domain/contributions/`
 - Git operations → `workers/infrastructure/git/`
-- Faye messaging → `workers/infrastructure/messaging/`
-- Progress tracking → `workers/presentation/values/`
+- Faye gateway and progress mapping → `workers/infrastructure/faye/`
 - Worker entry point → `workers/application/controllers/worker.rb`
 - Worker services → `workers/application/services/`
-- Request handling → `workers/application/requests/`
 
 **Adding a New API Endpoint:**
 1. Define service object in `app/application/services/` using Dry::Transaction

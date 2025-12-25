@@ -3,7 +3,7 @@
 # Requires all ruby files in specified worker folders
 # Worker has its own DDD layers parallel to the API:
 #   - domain: contributions entities/values/lib
-#   - infrastructure: git gateway/repositories/mappers, messaging
+#   - infrastructure: git gateway/repositories/mappers, faye server/mapper
 #   - presentation: progress monitor values
 #   - application: controllers, services, requests
 # Params:
